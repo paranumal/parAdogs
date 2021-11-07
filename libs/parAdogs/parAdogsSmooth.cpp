@@ -1,0 +1,149 @@
+/*
+
+The MIT License (MIT)
+
+Copyright (c) 2017 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+*/
+
+#include "parAdogs.hpp"
+#include "parAdogs/parAdogsMatrix.hpp"
+#include "parAdogs/parAdogsPartition.hpp"
+
+namespace paradogs {
+
+void parCSR::smoothChebyshev(dfloat b[], dfloat x[],
+                             const dfloat lambda0, const dfloat lambda1,
+                             const bool xIsZero, dfloat scratch[],
+                             const int ChebyshevIterations) {
+
+  const dfloat theta = 0.5*(lambda1+lambda0);
+  const dfloat delta = 0.5*(lambda1-lambda0);
+  const dfloat invTheta = 1.0/theta;
+  const dfloat sigma = theta/delta;
+  dfloat rho_n = 1./sigma;
+  dfloat rho_np1;
+
+  dfloat *d = scratch + 0*Ncols;
+  dfloat *r = scratch + 1*Ncols;
+
+  if(xIsZero){ //skip the Ax if x is zero
+    // r = D^{-1}b
+    // d = invTheta*r
+    // x = d
+    for (dlong n=0;n<Nrows;++n) {
+      const dfloat r_r = diagInv[n]*b[n];
+      r[n] = r_r;
+      d[n] = invTheta*r_r;
+      x[n] = invTheta*r_r;
+    }
+
+  } else {
+    //r = D^{-1}(b-A*x)
+    // halo->ExchangeStart(o_x, 1, ogs::Dfloat);
+
+    for (dlong n=0;n<Nrows;++n) {
+
+      dfloat rn = b[n];
+
+      const dlong start = diag.rowStarts[n];
+      const dlong end   = diag.rowStarts[n+1];
+      for (dlong j=start;j<end;++j) {
+        rn -= diag.vals[j]*x[diag.cols[j]];
+      }
+
+      r[n] = diagInv[n]*rn;
+    }
+
+    // halo->ExchangeFinish(o_x, 1, ogs::Dfloat);
+
+    // if (offd.NrowBlocks)
+    //   SmoothChebyshevMCSRKernel(offd.NrowBlocks,
+    //                  offd.o_blockRowStarts, offd.o_mRowStarts,
+    //                  offd.o_rows, offd.o_cols, offd.o_vals,
+    //                  o_diagInv, o_x, o_r);
+
+    const int last_it = (ChebyshevIterations==0) ? 1 : 0;
+
+    //d = invTheta*r
+    //x = x + d
+    if (last_it) {
+      for (dlong n=0;n<Nrows;++n) {
+        x[n] += invTheta*r[n];
+      }
+    } else {
+      for (dlong n=0;n<Nrows;++n) {
+        d[n] = invTheta*r[n];
+        x[n] += d[n];
+      }
+    }
+  }
+
+  for (int k=0;k<ChebyshevIterations;k++) {
+
+    //r_k+1 = r_k - D^{-1}Ad_k
+    // halo->ExchangeStart(o_d, 1, ogs::Dfloat);
+
+    for (dlong n=0;n<Nrows;++n) {
+
+      dfloat rn = 0.0;
+
+      const dlong start = diag.rowStarts[n];
+      const dlong end   = diag.rowStarts[n+1];
+      for (dlong j=start;j<end;++j) {
+        rn -= diag.vals[j]*d[diag.cols[j]];
+      }
+
+      r[n] += diagInv[n]*rn;
+    }
+
+    // halo->ExchangeFinish(o_d, 1, ogs::Dfloat);
+
+    // if (offd.NrowBlocks)
+    //   SmoothChebyshevMCSRKernel(offd.NrowBlocks,
+    //                  offd.o_blockRowStarts, offd.o_mRowStarts,
+    //                  offd.o_rows, offd.o_cols, offd.o_vals,
+    //                  o_diagInv, o_d, o_r);
+
+    const int last_it = (k==ChebyshevIterations-1) ? 1 : 0;
+
+    rho_np1 = 1.0/(2.*sigma-rho_n);
+
+    //d_k+1 = rho_k+1*rho_k*d_k  + 2*rho_k+1*r_k+1/delta
+    //x_k+1 = x_k + d_k+1
+    if (last_it) {
+      for (dlong n=0;n<Nrows;++n) {
+        const dfloat d_np1 = (rho_np1*rho_n)*d[n] + (2.0*rho_np1/delta)*r[n];
+        x[n] += d_np1;
+      }
+    } else {
+      for (dlong n=0;n<Nrows;++n) {
+        d[n] = (rho_np1*rho_n)*d[n] + (2.0*rho_np1/delta)*r[n];
+        x[n] += d[n];
+      }
+    }
+
+    rho_n = rho_np1;
+  }
+}
+
+
+}
