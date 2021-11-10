@@ -63,7 +63,7 @@ void parCSR::Aggregate(dlong& Nc,
 
       const dfloat Ajj = diagA[col];
 
-      if(-diag.vals[jj] > theta*(sqrt(Aii*Ajj)))
+      if(std::abs(diag.vals[jj]) > theta*(sqrt(Aii*Ajj)))
         strong_per_row++;
     }
     //non-local entries
@@ -104,9 +104,9 @@ void parCSR::Aggregate(dlong& Nc,
 
       const dfloat Ajj = diagA[col];
 
-      if(-diag.vals[jj] > theta*(sqrt(Aii*Ajj))) {
+      if(std::abs(diag.vals[jj]) > theta*(sqrt(Aii*Ajj))) {
         strong.diag.cols[counter] = col;
-        strong.diag.vals[counter++] = -diag.vals[jj] + distrib(paradogs::RNG);
+        strong.diag.vals[counter++] = std::abs(diag.vals[jj]) + distrib(paradogs::RNG);
       }
     }
     //non-local entries
@@ -210,7 +210,6 @@ void parCSR::Aggregate(dlong& Nc,
 
   } while(true);
 
-  delete[] Ts;
   delete[] Tr;
   delete[] Tn;
   delete[] rand;
@@ -219,8 +218,10 @@ void parCSR::Aggregate(dlong& Nc,
   Nc=0;
   for(dlong i=0; i<Nrows; i++) {
     if(state[i] == 1) {
+      Ts[i] = 1;
       FineToCoarse[i] = Nc++;
     } else {
+      Ts[i] = -1;
       FineToCoarse[i] = -1;
     }
   }
@@ -236,6 +237,7 @@ void parCSR::Aggregate(dlong& Nc,
         /*If this node is an MIS node, join the aggregate*/
         if (state[k]==1) {
           FineToCoarse[n] = sk;
+          Ts[n] = 1;
           break;
         }
       }
@@ -252,13 +254,13 @@ void parCSR::Aggregate(dlong& Nc,
 
       for(dlong j=strong.diag.rowStarts[n];j<strong.diag.rowStarts[n+1];j++){
         const dlong k = strong.diag.cols[j];
-        const int   sk = FineToCoarse[k];
-        if (sk!=-1) {
+        const int   sk = Ts[k];
+        if (sk!=-1) { /*If the neighbor is in the neighborhood of an MIS node*/
           // const float rk = rand[k];
           const float rk = strong.diag.vals[j];
           if( (rk>rmax)            || /*If edge is strongest*/
              ((rk==rmax)&&(k>kmax))) { /*Rare, but just in case, break tie with index number*/
-            smax = sk;
+            smax = FineToCoarse[k];
             rmax = rk;
             kmax = k;
           }
@@ -268,6 +270,7 @@ void parCSR::Aggregate(dlong& Nc,
     }
   }
 
+  delete[] Ts;
   delete[] state;
 }
 
