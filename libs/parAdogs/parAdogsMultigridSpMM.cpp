@@ -43,7 +43,7 @@ struct entry_t {
   }
 };
 
-parCSR& SpMM(const parCSR& A, const parCSR& B){
+parCSR SpMM(const parCSR& A, const parCSR& B){
 
   // MPI info
   // int rank, size;
@@ -283,6 +283,9 @@ parCSR& SpMM(const parCSR& A, const parCSR& B){
   // free(BoffdRowOffsets);
   // free(BoffdRows);
 
+  delete[] rowStarts;
+  delete[] rowCounts;
+
   // parCOO cooC(A.platform, A.comm);
 
   // //copy global partition
@@ -309,7 +312,7 @@ parCSR& SpMM(const parCSR& A, const parCSR& B){
   delete [] Ctmp;
 
   //build C from coo matrix
-  parCSR &C = *(new parCSR(A.Nrows, B.Ncols, nnz, entries));
+  parCSR C(A.Nrows, B.Ncols, nnz, entries);
 
   delete[] entries;
 

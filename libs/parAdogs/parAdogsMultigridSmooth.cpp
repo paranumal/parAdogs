@@ -30,7 +30,7 @@ SOFTWARE.
 
 namespace paradogs {
 
-void parCSR::smoothChebyshev(dfloat b[], dfloat x[],
+void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
                              const dfloat lambda0, const dfloat lambda1,
                              const bool xIsZero, dfloat scratch[],
                              const int ChebyshevIterations) {

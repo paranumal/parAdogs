@@ -250,12 +250,16 @@ void mgLevel_t::SplitLaplacian(const int partition[],
   delete[] map;
 }
 
-mgLevel_t::~mgLevel_t() {
+void mgLevel_t::Free() {
+  A.Free();
+  P.Free();
+  R.Free();
   if (null) {delete[] null; null=nullptr; }
   if (Fiedler) {delete[] Fiedler; Fiedler=nullptr; }
   if (X) {delete[] X; X=nullptr; }
   if (RHS) {delete[] RHS; RHS=nullptr; }
   if (RES) {delete[] RES; RES=nullptr; }
+  if (scratch) {delete[] scratch; scratch=nullptr; }
 }
 
 }

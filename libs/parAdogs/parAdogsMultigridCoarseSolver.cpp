@@ -262,7 +262,13 @@ void coarseSolver_t::Setup(parCSR &A, dfloat null[]) {
   delete[] coarseA;
 }
 
-coarseSolver_t::~coarseSolver_t() {
+void coarseSolver_t::Free() {
+  Nrows=0;
+  Ncols=0;
+  coarseTotal=0;
+  coarseOffset=0;
+  N=0;
+  offdTotal=0;
   if(coarseOffsets) {delete[] coarseOffsets; coarseOffsets=nullptr;}
   if(coarseCounts)  {delete[] coarseCounts; coarseCounts=nullptr;}
   if(sendOffsets)   {delete[] sendOffsets; sendOffsets=nullptr;}

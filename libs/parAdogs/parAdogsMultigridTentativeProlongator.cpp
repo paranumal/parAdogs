@@ -29,12 +29,11 @@ SOFTWARE.
 
 namespace paradogs {
 
-parCSR& TentativeProlongator(const dlong Nf,
-                             const dlong Nc,
-                             dlong FineToCoarse[],
-                             dfloat FineNull[],
-                             dfloat CoarseNull[]) {
-
+parCSR TentativeProlongator(const dlong Nf,
+                            const dlong Nc,
+                            dlong FineToCoarse[],
+                            dfloat FineNull[],
+                            dfloat CoarseNull[]) {
   dlong nnz = Nf;
   nonZero_t *entries = new nonZero_t[nnz];
 
@@ -46,7 +45,7 @@ parCSR& TentativeProlongator(const dlong Nf,
     entries[n].val = FineNull[n];
   }
 
-  parCSR &T = *(new parCSR(Nf, Nc, nnz, entries));
+  parCSR T(Nf, Nc, nnz, entries);
   delete[] entries;
 
   /*Init coarse null*/

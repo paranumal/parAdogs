@@ -29,7 +29,7 @@ SOFTWARE.
 
 namespace paradogs {
 
-parCSR& SmoothProlongator(const parCSR& A, const parCSR& T) {
+parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
 
   // MPI info
   // int rank, size;
@@ -349,7 +349,7 @@ parCSR& SmoothProlongator(const parCSR& A, const parCSR& T) {
   delete[] Ptmp;
 
   //build P from coo matrix
-  parCSR& P = *(new parCSR(T.Nrows, T.Ncols, nnz, entries));
+  parCSR P(T.Nrows, T.Ncols, nnz, entries);
 
   delete[] entries;
 

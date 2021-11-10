@@ -36,7 +36,7 @@ using std::sort;
 
 namespace paradogs {
 
-parCSR& Transpose(const parCSR& A) {
+parCSR Transpose(const parCSR& A) {
 
   // MPI info
   // int rank, size;
@@ -171,7 +171,7 @@ parCSR& Transpose(const parCSR& A) {
   delete[] rowStarts;
   delete[] rowCounts;
 
-  parCSR& AT = *(new parCSR(A.Ncols, A.Nrows, NNZ, entries));
+  parCSR AT(A.Ncols, A.Nrows, NNZ, entries);
 
   delete[] entries;
 

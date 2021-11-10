@@ -104,7 +104,10 @@ void Partition(graph_t& graph,
       for (dlong n=0;n<graphR.Nverts;++n){
         partition[mapR[n]] = 1 + NpartsL-1;
       }
+
     }
+    delete[] mapL;
+    delete[] mapR;
   }
 }
 

@@ -129,4 +129,15 @@ meshHex3D::meshHex3D(platform_t& _platform, meshSettings_t& _settings, MPI_Comm 
 }
 
 mesh_t::~mesh_t() {
+  if (plotEToV) {free(plotEToV); plotEToV=nullptr;}
+  if (faceVertices) {free(faceVertices); faceVertices=nullptr;}
+  if (boundaryInfo) {free(boundaryInfo); boundaryInfo=nullptr;}
+  if (elementInfo) {free(elementInfo); elementInfo=nullptr;}
+  if (EToV) {free(EToV); EToV=nullptr;}
+  if (EToE) {free(EToE); EToE=nullptr;}
+  if (EToF) {free(EToF); EToF=nullptr;}
+  if (EToP) {free(EToP); EToP=nullptr;}
+  if (EX) {free(EX); EX=nullptr;}
+  if (EY) {free(EY); EY=nullptr;}
+  if (EZ) {free(EZ); EZ=nullptr;}
 }

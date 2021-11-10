@@ -89,7 +89,11 @@ public:
          const dlong NNZ,
          nonZero_t entries[]);
 
-  ~parCSR();
+  /*Assignment - Copy & swap idiom*/
+  parCSR& operator=(parCSR A);
+
+  ~parCSR() {Free();}
+  void Free();
 
   void haloSetup(hlong *colIds);
 
@@ -107,7 +111,7 @@ public:
   void SpMV(const dfloat alpha, dfloat x[],
             const dfloat beta, const dfloat y[], dfloat z[]);
 
-  void smoothChebyshev(dfloat b[], dfloat x[],
+  void SmoothChebyshev(dfloat b[], dfloat x[],
                        const dfloat lambda0, const dfloat lambda1,
                        const bool xIsZero, dfloat scratch[],
                        const int ChebyshevIterations);

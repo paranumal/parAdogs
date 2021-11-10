@@ -102,20 +102,21 @@ void mgLevel_t::CoarsenLevel(mgLevel_t& Lf) {
   null = new dfloat[Nc];
 
   /* Tentative prolongation operator*/
-  parCSR& T = TentativeProlongator(Nf, Nc, FineToCoarse,
-                                   Lf.null, null);
+  parCSR T = TentativeProlongator(Nf, Nc, FineToCoarse,
+                                  Lf.null, null);
+  delete[] FineToCoarse;
 
   /* Smoothed prologontion */
   Lf.P = SmoothProlongator(Lf.A, T);
-  delete &T;
+  T.Free();
 
   /* R = P^T*/
   Lf.R = Transpose(Lf.P);
 
   /*Galerkin product*/
-  parCSR &AP = SpMM(Lf.A, Lf.P);
+  parCSR AP = SpMM(Lf.A, Lf.P);
   A = SpMM(Lf.R, AP);
-  delete &AP;
+  AP.Free();
   // A.GalerkinProduct(Lf.A, Lf.P);
 
   /*fill diagonal*/
@@ -143,6 +144,13 @@ void mgLevel_t::CoarsenLevel(mgLevel_t& Lf) {
   RHS = new dfloat[A.Nrows];
   X = new dfloat[A.Nrows];
   RES = new dfloat[A.Nrows];
+}
+
+/*Free coarse levels of hierarchy*/
+void graph_t::MultigridDestroy() {
+  coarseSolver.Free();
+  for (int n=Nlevels-1;n>0;--n) L[n].Free();
+  Nlevels=1;
 }
 
 }

@@ -58,8 +58,14 @@ void Bipartition(graph_t& graph,
                  const dfloat targetFraction[2],
                  int partition[]) {
 
+  /*Create multilevel heirarchy*/
+  graph.MultigridSetup();
+
   /*Compute Fiedler vector */
   dfloat *Fiedler = graph.FiedlerVector();
+
+  /*Clear the coarse levels*/
+  graph.MultigridDestroy();
 
   /*Use Fiedler vector to bipartion graph*/
   keyVal_t *F = new keyVal_t[graph.Nverts];

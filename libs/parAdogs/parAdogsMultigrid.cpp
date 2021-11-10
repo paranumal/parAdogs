@@ -81,7 +81,7 @@ void mgLevel_t::Prolongate(dfloat xC[], dfloat x[]) {
 
 void mgLevel_t::Smooth(dfloat r[], dfloat x[], const bool xIsZero) {
   const int ChebyshevIterations=2;
-  A.smoothChebyshev(r, x, lambda0, lambda1,
+  A.SmoothChebyshev(r, x, lambda0, lambda1,
                     xIsZero, scratch,
                     ChebyshevIterations);
 }

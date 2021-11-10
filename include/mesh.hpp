@@ -62,27 +62,27 @@ public:
   int elementType;
 
   hlong Nnodes=0; //global number of element vertices
-  dfloat *EX; // coordinates of vertices for each element
-  dfloat *EY;
-  dfloat *EZ;
+  dfloat *EX=nullptr; // coordinates of vertices for each element
+  dfloat *EY=nullptr;
+  dfloat *EZ=nullptr;
 
   dlong Nelements=0;       //local element count
   hlong NelementsGlobal=0; //global element count
-  hlong *EToV; // element-to-vertex connectivity
-  dlong *EToE; // element-to-element connectivity
-  int   *EToF; // element-to-(local)face connectivity
-  int   *EToP; // element-to-partition/process connectivity
-  int   *EToB; // element-to-boundary condition type
+  hlong *EToV=nullptr; // element-to-vertex connectivity
+  dlong *EToE=nullptr; // element-to-element connectivity
+  int   *EToF=nullptr; // element-to-(local)face connectivity
+  int   *EToP=nullptr; // element-to-partition/process connectivity
+  int   *EToB=nullptr; // element-to-boundary condition type
 
-  hlong *elementInfo; //type of element
+  hlong *elementInfo=nullptr; //type of element
 
   // boundary faces
   hlong NboundaryFaces=0; // number of boundary faces
-  hlong *boundaryInfo; // list of boundary faces (type, vertex-1, vertex-2, vertex-3)
+  hlong *boundaryInfo=nullptr; // list of boundary faces (type, vertex-1, vertex-2, vertex-3)
 
   int    plotNverts=0;    // number of vertices for each plot element
   int    plotNelements=0; // number of "plot elements" per element
-  int    *plotEToV;       // triangulation of plot nodes
+  int    *plotEToV=nullptr;       // triangulation of plot nodes
 
   mesh_t() = delete;
   mesh_t(platform_t& _platform, meshSettings_t& _settings,

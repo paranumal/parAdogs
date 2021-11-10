@@ -78,6 +78,9 @@ public:
   void MultigridVcycle(const int l,
                       dfloat r[],
                       dfloat x[]);
+
+  /*Clear multilevel heirarchy*/
+  void MultigridDestroy();
 };
 
 }

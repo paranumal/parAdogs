@@ -39,9 +39,6 @@ graph_t::graph_t(const dlong Nelements, const int Nfaces,
   /*Create graph Laplacian from mesh*/
   Nlevels=1;
   L[0].CreateLaplacian(Nelements, Nfaces, EToE, EToP, comm);
-
-  /*Create multilevel heirarchy*/
-  MultigridSetup();
 }
 
 /*Divide graph into two pieces according to a bipartition*/
@@ -65,9 +62,6 @@ void graph_t::Split(const int partition[],
   L[0].SplitLaplacian(partition,
                       graphL.L[0], mapL,
                       graphR.L[0], mapR);
-
-  graphL.MultigridSetup();
-  graphR.MultigridSetup();
 }
 
 }

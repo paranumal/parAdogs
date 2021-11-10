@@ -129,6 +129,7 @@ parCSR::parCSR(dlong _Nrows, dlong _Ncols,
   diag.rowStarts = new dlong[Nrows+1];
   // offd.rowStarts = (dlong *) calloc(Nrows+1, sizeof(dlong));
 
+  #pragma omp parallel for
   for (dlong n=0;n<Nrows+1;n++) diag.rowStarts[n]=0;
 
   // //count the entries in each row
@@ -293,11 +294,17 @@ void parCSR::haloSetup(hlong *colIds) {
   // free(parIds);
 }
 
-parCSR::~parCSR() {
+void parCSR::Free() {
+  Nrows=0;
+  Ncols=0;
+
+  diag.nnz=0;
   if (diag.rowStarts) {delete[] diag.rowStarts; diag.rowStarts=nullptr;}
   if (diag.cols)      {delete[] diag.cols; diag.cols=nullptr;}
   if (diag.vals)      {delete[] diag.vals; diag.vals=nullptr;}
 
+  offd.nnz=0;
+  offd.nzRows=0;
   if (offd.rowStarts)  {delete[] offd.rowStarts; offd.rowStarts=nullptr;}
   if (offd.mRowStarts) {delete[] offd.mRowStarts; offd.mRowStarts=nullptr;}
   if (offd.rows) {delete[] offd.rows; offd.rows=nullptr;}
@@ -312,6 +319,41 @@ parCSR::~parCSR() {
   if (colMap) {delete[] colMap; colMap=nullptr;}
 
   if (halo)   {halo->Free(); halo = nullptr;}
+  NlocalCols=0;
+
+  rho=0.0;
+}
+
+// Assignment operator, copy & swap idiom
+parCSR& parCSR::operator=(parCSR A) {
+  std::swap(Nrows,A.Nrows);
+  std::swap(Ncols,A.Ncols);
+
+  std::swap(diag.nnz, A.diag.nnz);
+  std::swap(diag.rowStarts, A.diag.rowStarts);
+  std::swap(diag.cols, A.diag.cols);
+  std::swap(diag.vals, A.diag.vals);
+
+  std::swap(offd.nnz, A.offd.nnz);
+  std::swap(offd.nzRows, A.offd.nzRows);
+  std::swap(offd.rowStarts, A.offd.rowStarts);
+  std::swap(offd.mRowStarts, A.offd.mRowStarts);
+  std::swap(offd.rows, A.offd.rows);
+  std::swap(offd.cols, A.offd.cols);
+  std::swap(offd.vals, A.offd.vals);
+
+  std::swap(diagA, A.diagA);
+  std::swap(diagInv, A.diagInv);
+
+  std::swap(globalRowStarts, A.globalRowStarts);
+  std::swap(globalColStarts, A.globalColStarts);
+  std::swap(colMap, A.colMap);
+
+  std::swap(halo, A.halo);
+  std::swap(NlocalCols, A.NlocalCols);
+
+  std::swap(rho, A.rho);
+  return *this;
 }
 
 //------------------------------------------------------------------------

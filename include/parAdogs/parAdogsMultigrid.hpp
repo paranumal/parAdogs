@@ -52,7 +52,8 @@ public:
 
   dfloat lambda1, lambda0; //smoothing params
 
-  ~mgLevel_t();
+  ~mgLevel_t() {Free();}
+  void Free();
 
   /*Create graph Laplacian*/
   void CreateLaplacian(const dlong Nelements,
@@ -81,18 +82,18 @@ public:
   void Prolongate(dfloat xC[], dfloat x[]);
 };
 
-parCSR& TentativeProlongator(const dlong Nf,
-                             const dlong Nc,
-                             dlong FineToCoarse[],
-                             dfloat FineNull[],
-                             dfloat CoarseNull[]);
+parCSR TentativeProlongator(const dlong Nf,
+                            const dlong Nc,
+                            dlong FineToCoarse[],
+                            dfloat FineNull[],
+                            dfloat CoarseNull[]);
 
-parCSR& SmoothProlongator(const parCSR& A,
-                          const parCSR& T);
+parCSR SmoothProlongator(const parCSR& A,
+                         const parCSR& T);
 
-parCSR& Transpose(const parCSR& A);
+parCSR Transpose(const parCSR& A);
 
-parCSR& SpMM(const parCSR& A, const parCSR& B);
+parCSR SpMM(const parCSR& A, const parCSR& B);
 
 class coarseSolver_t {
 
@@ -100,20 +101,21 @@ public:
   int Nrows=0;
   int Ncols=0;
 
-  int coarseTotal;
-  int coarseOffset;
+  int coarseTotal=0;
+  int coarseOffset=0;
   int *coarseOffsets=nullptr;
   int *coarseCounts=nullptr;
   int *sendOffsets=nullptr;
   int *sendCounts=nullptr;
 
-  int N;
+  int N=0;
   int offdTotal=0;
 
   dfloat *diagInvA=nullptr, *offdInvA=nullptr;
   dfloat *diagRhs=nullptr, *offdRhs=nullptr;
 
-  ~coarseSolver_t();
+  ~coarseSolver_t() {Free();}
+  void Free();
 
   void Setup(parCSR &A, dfloat null[]);
   void Solve(dfloat r[], dfloat x[]);
