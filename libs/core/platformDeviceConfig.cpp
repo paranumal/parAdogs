@@ -100,19 +100,37 @@ void platform_t::DeviceConfig(){
     mode += ", device_id: " + std::to_string(device_id) + "}";
   }
 
-  //set number of omp threads to use
-  int Ncores = omp_get_num_procs();
-  int Nthreads = Ncores/localSize;
+  /*set number of omp threads to use*/
+  /*Use lscpu to determine core and socket counts */
+  FILE *pipeCores   = popen("lscpu | grep \"Core(s) per socket\" | awk '{print $4}'", "r");
+  FILE *pipeSockets = popen("lscpu | grep \"Socket(s)\" | awk '{print $2}'", "r");
+  if (!pipeCores || !pipeSockets) {
+    LIBP_ABORT("popen() failed!");
+  }
+  std::array<char, 128> buffer;
+  fgets(buffer.data(), buffer.size(), pipeCores);
+  int Ncores = std::stoi(buffer.data());
+  fgets(buffer.data(), buffer.size(), pipeSockets);
+  int Nsockets = std::stoi(buffer.data());
+
+  pclose(pipeCores);
+  pclose(pipeSockets);
+
+  // int Ncores = omp_get_num_procs();
+  int NcoresPerNode = Ncores*Nsockets;
+  int Nthreads = NcoresPerNode/localSize;
   if (Nthreads==0) {
     stringstream ss;
     ss << "Rank " << rank << " oversubscribing CPU on node \"" << hostname<< "\"";
     LIBP_WARNING(ss.str());
     Nthreads = 1;
   }
+  // omp_set_num_threads(Nthreads);
   omp_set_num_threads(1);
 
   // if (settings.compareSetting("VERBOSE","TRUE"))
-  //   printf("Rank %d: Ncores = %d, Nthreads = %d, device_id = %d \n", rank, Ncores, Nthreads, device_id);
+    printf("Rank %d: Nsockets = %d, NcoresPerSocket = %d, Nthreads = %d, device_id = %d \n",
+           rank, Nsockets, Ncores, Nthreads, device_id);
 
   device.setup(mode);
 

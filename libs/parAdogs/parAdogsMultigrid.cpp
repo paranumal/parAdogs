@@ -25,28 +25,58 @@ SOFTWARE.
 */
 
 #include "parAdogs.hpp"
+#include "parAdogs/parAdogsGraph.hpp"
 #include "parAdogs/parAdogsMultigrid.hpp"
 
 namespace paradogs {
+
+/****************************************/
+/* Multigrid vcycle                     */
+/****************************************/
+void graph_t::MultigridVcycle(const int l,
+                              dfloat r[],
+                              dfloat x[]) {
+
+  //check for base level
+  if(l==Nlevels-1) {
+    coarseSolver.Solve(r, x);
+    return;
+  }
+
+  mgLevel_t& Lf = L[l];
+  dfloat *res = Lf.RES;
+
+  mgLevel_t& Lc = L[l+1];
+  dfloat *rC = Lc.RHS;
+  dfloat *xC = Lc.X;
+
+  //Pre smooth and then compute res = rhs-Ax
+  Lf.Smooth(r, x, true);
+  Lf.Residual(r, x, res);
+
+  // rhsC = P^T res
+  Lf.Coarsen(res, rC);
+
+  // Recursive call
+  MultigridVcycle(l+1, rC, xC);
+
+  // x = x + P xC
+  Lf.Prolongate(xC, x);
+
+  // Post smooth
+  Lf.Smooth(r, x, false);
+}
 
 void mgLevel_t::Residual(dfloat r[], dfloat x[], dfloat res[]) {
   A.SpMV(-1.0, x, 1.0, r, res);
 }
 
 void mgLevel_t::Coarsen(dfloat x[], dfloat xC[]) {
-  for (dlong n=0;n<Nc;n++) {
-    xC[n]=0.0;
-  }
-
-  for (dlong n=0;n<A.Nrows;n++) {
-    xC[FineToCoarse[n]] += P[n]*x[n];
-  }  
+  R.SpMV(1.0, x, 0.0, xC);
 }
 
 void mgLevel_t::Prolongate(dfloat xC[], dfloat x[]) {
-  for (dlong n=0;n<A.Nrows;n++) {
-    x[n] += P[n]*xC[FineToCoarse[n]];
-  }
+  P.SpMV(1.0, xC, 1.0, x);
 }
 
 void mgLevel_t::Smooth(dfloat r[], dfloat x[], const bool xIsZero) {
@@ -56,42 +86,6 @@ void mgLevel_t::Smooth(dfloat r[], dfloat x[], const bool xIsZero) {
                     ChebyshevIterations);
 }
 
-void coarseSolver_t::Solve(dfloat rhs[], dfloat x[]) {
 
-  //queue local part of gemv
-  // const dfloat one=1.0;
-  // const dfloat zero=0.0;
-  // if (N)
-  //   dGEMVKernel(N,N,one,o_diagInvAT,o_rhs, zero, o_x);
-
-  // if(offdTotal) {
-  //   //wait for data to arrive on host
-  //   platform.device.setStream(ogs::dataStream);
-  //   platform.device.finish();
-
-
-  //   //gather the offd rhs entries
-  //   MPI_Alltoallv(diagRhs,   sendCounts,   sendOffsets, MPI_DFLOAT,
-  //                 offdRhs, coarseCounts, coarseOffsets, MPI_DFLOAT, comm);
-
-  //   //queue transfering coarse vector to device
-  //   o_offdRhs.copyFrom(offdRhs, offdTotal*sizeof(dfloat), 0, "async: true");
-  //   platform.device.finish(); //wait for transfer to complete
-
-  //   platform.device.setStream(currentStream);
-
-  //   //queue offd part of gemv
-  //   if (N)
-  //     dGEMVKernel(N,offdTotal, one, o_offdInvAT,o_offdRhs, one, o_x);
-  // }
-
-  for (int n=0;n<N;++n) {
-    dfloat xn=0.0;
-    for (int m=0;m<N;++m) {
-      xn += diagInvA[n*N + m]*rhs[m];
-    }
-    x[n] = xn;
-  }
-}
 
 }

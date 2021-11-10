@@ -53,8 +53,6 @@ public:
           const int* EToP,
           MPI_Comm comm);
 
-  /*Create multilevel heirarchy*/
-  void MultigridSetup();
 
   /*Divide graph into two pieces according to a bisection*/
   void Split(const int partition[],
@@ -64,8 +62,8 @@ public:
   /*Compute Fiedler vector of graph */
   dfloat* FiedlerVector();
 
-  /*Project and improve a Fiedler vector*/
-  void Project(const int level);
+  /*Improve a Fiedler vector*/
+  void Refine(const int level);
 
   /* Solve A_{l}*x = b*/
   int Solve(const int level,
@@ -74,9 +72,12 @@ public:
             dfloat x[],
             dfloat scratch[]);
 
-  void vcycle(const int l,
-              dfloat r[],
-              dfloat x[]);
+  /*Create multilevel heirarchy*/
+  void MultigridSetup();
+
+  void MultigridVcycle(const int l,
+                      dfloat r[],
+                      dfloat x[]);
 };
 
 }

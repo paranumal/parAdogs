@@ -31,27 +31,18 @@ SOFTWARE.
 namespace paradogs {
 
 /****************************************/
-/* Project Fiedler Vector               */
+/* Refine Fiedler Vector               */
 /****************************************/
-void graph_t::Project(const int level) {
+void graph_t::Refine(const int level) {
 
   parCSR &A = L[level].A;
   dfloat *null = L[level].null;
   const dlong N = A.Nrows;
 
-  dfloat *cFiedler = L[level+1].Fiedler;
-
-  dlong *FineToCoarse = L[level].FineToCoarse;
-  dfloat *P = L[level].P;
   dfloat *Fiedler = L[level].Fiedler;
 
-  /*Project coarse Fiedler vector*/
-  for (dlong n=0;n<N;++n) {
-    Fiedler[n] = P[n]*cFiedler[FineToCoarse[n]];
-  }
-
   /*******************************************************/
-  /*Now improve fine Fiedler vector via Inverse Iteration*/
+  /*Improve fine Fiedler vector via Inverse Iteration    */
   /*******************************************************/
 
   const dfloat RELTOL = 3.0e-1;

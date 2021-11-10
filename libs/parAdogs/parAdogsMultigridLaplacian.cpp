@@ -40,6 +40,8 @@ void mgLevel_t::CreateLaplacian(const dlong Nelements,
   A.Nrows = Nelements;
   A.Ncols = Nelements;
   A.diag.rowStarts = new dlong[Nelements+1];
+
+  #pragma omp parallel for
   for (dlong n=0;n<Nelements+1;++n) {
     A.diag.rowStarts[n] = 0;
   }
@@ -64,6 +66,7 @@ void mgLevel_t::CreateLaplacian(const dlong Nelements,
 
   /*Build connectivity*/
   A.diagA = new dfloat[A.Nrows];
+  A.diagInv = new dfloat[A.Nrows];
   A.diag.cols = new dlong[A.diag.nnz];
   A.diag.vals = new dfloat[A.diag.nnz];
 
@@ -84,10 +87,13 @@ void mgLevel_t::CreateLaplacian(const dlong Nelements,
       }
     }
     A.diagA[e] = Ann;
+    A.diagInv[e] = 1.0/Ann;
   }
 
   /*Construct fine null vector*/
   null = new dfloat[Nelements];
+
+  #pragma omp parallel for
   for (dlong n=0;n<Nelements;++n) {
     null[n] = 1.0/sqrt(Nelements);
   }
@@ -101,20 +107,22 @@ void mgLevel_t::CreateLaplacian(const dlong Nelements,
 
 /*Split a graph Laplacian in two based on a partitioning*/
 void mgLevel_t::SplitLaplacian(const int partition[],
-                                mgLevel_t &L, dlong mapL[],
-                                mgLevel_t &R, dlong mapR[]) {
+                                mgLevel_t &LL, dlong mapL[],
+                                mgLevel_t &LR, dlong mapR[]) {
 
   dlong* map = new dlong[A.Nrows];
 
-  parCSR &AL = L.A;
-  parCSR &AR = R.A;
+  parCSR &AL = LL.A;
+  parCSR &AR = LR.A;
 
   AL.diag.rowStarts = new dlong[AL.Nrows+1];
   AR.diag.rowStarts = new dlong[AR.Nrows+1];
 
+  #pragma omp parallel for
   for (dlong n=0;n<AL.Nrows+1;++n) {
     AL.diag.rowStarts[n] = 0;
   }
+  #pragma omp parallel for
   for (dlong n=0;n<AR.Nrows+1;++n) {
     AR.diag.rowStarts[n] = 0;
   }
@@ -168,6 +176,8 @@ void mgLevel_t::SplitLaplacian(const int partition[],
 
   AL.diagA = new dfloat[AL.Nrows];
   AR.diagA = new dfloat[AR.Nrows];
+  AL.diagInv = new dfloat[AL.Nrows];
+  AR.diagInv = new dfloat[AR.Nrows];
 
   AL.diag.nnz=0;
   for (dlong nn=0;nn<AL.Nrows;++nn) {
@@ -190,6 +200,7 @@ void mgLevel_t::SplitLaplacian(const int partition[],
       }
     }
     AL.diagA[nn] = Ann;
+    AL.diagInv[nn] = 1.0/Ann;
   }
 
   AR.diag.nnz=0;
@@ -213,32 +224,33 @@ void mgLevel_t::SplitLaplacian(const int partition[],
       }
     }
     AR.diagA[nn] = Ann;
+    AR.diagInv[nn] = 1.0/Ann;
   }
 
   /*Construct null vectors*/
-  L.null = new dfloat[AL.Nrows];
+  LL.null = new dfloat[AL.Nrows];
+  #pragma omp parallel for
   for (dlong n=0;n<AL.Nrows;++n) {
-    L.null[n] = 1.0/sqrt(AL.Nrows);
+    LL.null[n] = 1.0/sqrt(AL.Nrows);
   }
-  R.null = new dfloat[AR.Nrows];
+  LR.null = new dfloat[AR.Nrows];
+  #pragma omp parallel for
   for (dlong n=0;n<AR.Nrows;++n) {
-    R.null[n] = 1.0/sqrt(AR.Nrows);
+    LR.null[n] = 1.0/sqrt(AR.Nrows);
   }
 
   /*Space for Fiedler*/
-  L.Fiedler = new dfloat[AL.Nrows];
-  R.Fiedler = new dfloat[AR.Nrows];
+  LL.Fiedler = new dfloat[AL.Nrows];
+  LR.Fiedler = new dfloat[AR.Nrows];
 
   /*Multigrid buffers*/
-  L.RES = new dfloat[AL.Nrows];
-  R.RES = new dfloat[AR.Nrows];
+  LL.RES = new dfloat[AL.Nrows];
+  LR.RES = new dfloat[AR.Nrows];
 
   delete[] map;
 }
 
 mgLevel_t::~mgLevel_t() {
-  if (FineToCoarse) {delete[] FineToCoarse; FineToCoarse=nullptr; }
-  if (P) {delete[] P; P=nullptr; }
   if (null) {delete[] null; null=nullptr; }
   if (Fiedler) {delete[] Fiedler; Fiedler=nullptr; }
   if (X) {delete[] X; X=nullptr; }

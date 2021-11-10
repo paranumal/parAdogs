@@ -67,7 +67,7 @@ int graph_t::Solve(const int level,
     }
 
     // z = Precon^{-1} r
-    vcycle(level, r, z);
+    MultigridVcycle(level, r, z);
 
     // r.z
     rdotz2 = rdotz1;

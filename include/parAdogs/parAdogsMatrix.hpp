@@ -33,29 +33,12 @@ SOFTWARE.
 
 namespace paradogs {
 
-//distributed matrix class passed to AMG setup
-class parCOO {
-public:
-  dlong nnz=0;
-  hlong *globalRowStarts=nullptr;
-  hlong *globalColStarts=nullptr;
-
-  //non-zero matrix entries
-  struct nonZero_t {
-    hlong row;
-    hlong col;
-    dfloat val;
-  };
-  nonZero_t *entries=nullptr;
-
-  parCOO() {};
-
-  ~parCOO() {
-    if(entries)         {delete[] entries;         entries=nullptr;}
-    if(globalRowStarts) {delete[] globalRowStarts; globalRowStarts=nullptr;}
-    if(globalColStarts) {delete[] globalColStarts; globalColStarts=nullptr;}
-  }
+struct nonZero_t {
+  hlong row;
+  hlong col;
+  dfloat val;
 };
+
 
 class parCSR {
 public:
@@ -102,7 +85,9 @@ public:
   parCSR(dlong N, dlong M): Nrows(N), Ncols(M) {}
 
   //build a parCSR matrix from a distributed COO matrix
-  parCSR(parCOO& A);
+  parCSR(dlong _Nrows, dlong _Ncols,
+         const dlong NNZ,
+         nonZero_t entries[]);
 
   ~parCSR();
 
@@ -115,10 +100,7 @@ public:
   void Aggregate(dlong& cNverts,
                  dlong FineToCoarse[]);
 
-  void GalerkinProduct(parCSR &A,
-                     const dlong Nc,
-                     const dlong FtoC[],
-                     const dfloat P[]);
+  void GalerkinProduct(const parCSR &A, const parCSR &P);
 
   void SpMV(const dfloat alpha, dfloat x[],
             const dfloat beta, dfloat y[]);

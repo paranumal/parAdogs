@@ -44,13 +44,19 @@ dfloat* graph_t::FiedlerVector() {
 
   /*Project and improve the Fiedler vector to the fine level*/
   for (int l=Nlevels-2;l>=0;--l) {
-    Project(l);
+    /*Prolongate Fiedler vector to fine graph*/
+    L[l].P.SpMV(1.0, L[l+1].Fiedler, 0.0, L[l].Fiedler);
+
+    /*Refine the Fiedler vector*/
+    Refine(l);
   }
 
-  // gFiedler = new dfloat[graph.Nverts];
-  // for (dlong n=0;n<graph.Nverts;++n) gFiedler[n] = L[0].Fiedler[n];
+  // gFiedler = new dfloat[Nverts];
+  // for (dlong n=0;n<Nverts;++n) gFiedler[n] = L[0].Fiedler[n];
   return L[0].Fiedler;
 }
+
+
 
 /*Compute Fiedler vector of graph Laplacian*/
 void mgLevel_t::FiedlerVector() {

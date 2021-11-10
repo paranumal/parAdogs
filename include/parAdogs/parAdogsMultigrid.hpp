@@ -36,12 +36,8 @@ namespace paradogs {
 class mgLevel_t {
 public:
   // parCSR A, P, R;
-  parCSR A;
-  dfloat *P=nullptr;
+  parCSR A, R, P;
 
-  dlong Nc=0;
-  dlong* FineToCoarse=nullptr;
-  
   /*null vector*/
   dfloat *null=nullptr;
 
@@ -84,6 +80,19 @@ public:
   void Coarsen(dfloat x[], dfloat xC[]);
   void Prolongate(dfloat xC[], dfloat x[]);
 };
+
+parCSR& TentativeProlongator(const dlong Nf,
+                             const dlong Nc,
+                             dlong FineToCoarse[],
+                             dfloat FineNull[],
+                             dfloat CoarseNull[]);
+
+parCSR& SmoothProlongator(const parCSR& A,
+                          const parCSR& T);
+
+parCSR& Transpose(const parCSR& A);
+
+parCSR& SpMM(const parCSR& A, const parCSR& B);
 
 class coarseSolver_t {
 

@@ -49,6 +49,7 @@ void parCSR::smoothChebyshev(dfloat b[], dfloat x[],
     // r = D^{-1}b
     // d = invTheta*r
     // x = d
+    #pragma omp parallel for
     for (dlong n=0;n<Nrows;++n) {
       const dfloat r_r = diagInv[n]*b[n];
       r[n] = r_r;
@@ -60,6 +61,7 @@ void parCSR::smoothChebyshev(dfloat b[], dfloat x[],
     //r = D^{-1}(b-A*x)
     // halo->ExchangeStart(o_x, 1, ogs::Dfloat);
 
+    #pragma omp parallel for
     for (dlong n=0;n<Nrows;++n) {
 
       dfloat rn = b[n];
@@ -86,10 +88,12 @@ void parCSR::smoothChebyshev(dfloat b[], dfloat x[],
     //d = invTheta*r
     //x = x + d
     if (last_it) {
+      #pragma omp parallel for
       for (dlong n=0;n<Nrows;++n) {
         x[n] += invTheta*r[n];
       }
     } else {
+      #pragma omp parallel for
       for (dlong n=0;n<Nrows;++n) {
         d[n] = invTheta*r[n];
         x[n] += d[n];
@@ -102,6 +106,7 @@ void parCSR::smoothChebyshev(dfloat b[], dfloat x[],
     //r_k+1 = r_k - D^{-1}Ad_k
     // halo->ExchangeStart(o_d, 1, ogs::Dfloat);
 
+    #pragma omp parallel for
     for (dlong n=0;n<Nrows;++n) {
 
       dfloat rn = 0.0;
@@ -130,11 +135,13 @@ void parCSR::smoothChebyshev(dfloat b[], dfloat x[],
     //d_k+1 = rho_k+1*rho_k*d_k  + 2*rho_k+1*r_k+1/delta
     //x_k+1 = x_k + d_k+1
     if (last_it) {
+      #pragma omp parallel for
       for (dlong n=0;n<Nrows;++n) {
         const dfloat d_np1 = (rho_np1*rho_n)*d[n] + (2.0*rho_np1/delta)*r[n];
         x[n] += d_np1;
       }
     } else {
+      #pragma omp parallel for
       for (dlong n=0;n<Nrows;++n) {
         d[n] = (rho_np1*rho_n)*d[n] + (2.0*rho_np1/delta)*r[n];
         x[n] += d[n];

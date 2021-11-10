@@ -42,7 +42,7 @@ void PartitionMesh(const dlong Nelements, const int Nfaces,
   /* Create graph from mesh info, and initialize multilevel Laplacian*/
   graph_t graph(Nelements, Nfaces, EToE, EToP, comm);
 
-  const int Nparts=7;
+  const int Nparts=8;
 
   dfloat *targetFraction = new dfloat[Nparts];
   for (int n=0;n<Nparts;++n) targetFraction[n] = 1.0/Nparts;
