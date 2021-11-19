@@ -24,41 +24,45 @@ SOFTWARE.
 
 */
 
-#include "mesh.hpp"
+#include "parAdogs.hpp"
+#include "parAdogs/parAdogsGraph.hpp"
+#include "parAdogs/parAdogsPartition.hpp"
 
-void mesh_t::PrintPartitionStatistics(){
+namespace paradogs {
 
-  /* now gather statistics on connectivity between processes */
-  int *comms = (int*) calloc(size, sizeof(int));
-  int Ncomms = 0;
+/****************************************/
+/* Multilevel Spectral Bipartition      */
+/****************************************/
+void graph_t::SpectralBipartition(const dfloat targetFraction[2]) {
 
-  /* count elements with neighbors on each other rank ranks */
-  for(dlong e=0;e<Nelements;++e){
-    for(int f=0;f<Nfaces;++f){
-      if(EToP[e*Nfaces+f]!=-1){
-        ++comms[EToP[e*Nfaces+f]];
-        ++Ncomms;
-      }
+  int* partition = new int[Nverts];
+
+  /*Create multilevel heirarchy*/
+  MultigridSetup();
+
+  /*Compute Fiedler vector */
+  dfloat *Fiedler = FiedlerVector();
+
+  /*Clear the coarse levels*/
+  MultigridDestroy();
+
+  /*Use Fiedler vector to bipartion graph*/
+  const hlong K = std::ceil(targetFraction[0]*Nverts);
+  const dfloat pivot = ParallelPivot(Nverts, Fiedler, K, comm);
+
+  for (dlong n=0;n<Nverts;++n) {
+    if (Fiedler[n]<=pivot) {
+      partition[n] = 0;
+    } else {
+      partition[n] = 1;
     }
   }
 
-  int Nmessages = 0;
-  for(int rr=0;rr<size;++rr)
-    if(comms[rr]>0)
-      ++Nmessages;
+  /*Split the graph according to this partitioning*/
+  Split(partition);
 
-  for(int rr=0;rr<size;++rr){
-    MPI_Barrier(comm);
-    if(rr==rank){
-      fflush(stdout);
-      printf("r: %02d [", rank);
-      for(int ss=0;ss<size;++ss){
-        printf(" %04d", comms[ss]);
-      }
-      printf("] (Nelements=" dlongFormat ", Nmessages=%d, Ncomms=%d)\n", Nelements,Nmessages, Ncomms);
-      fflush(stdout);
-    }
-  }
-
-  free(comms);
+  delete[] partition;
 }
+
+}
+

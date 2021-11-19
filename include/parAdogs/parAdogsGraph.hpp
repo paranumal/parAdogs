@@ -34,30 +34,90 @@ SOFTWARE.
 
 namespace paradogs {
 
+#define MAX_NVERTS 8
+#define MAX_NFACES 6
+#define MAX_NFACEVERTS 4
+
 class graph_t {
-public:
+private:
+  MPI_Comm gcomm=MPI_COMM_NULL;
+  MPI_Comm comm=MPI_COMM_NULL;
+
+  int rank, size;
   dlong Nverts=0;
   hlong NVertsGlobal=0;
+  hlong VoffsetL=0, VoffsetU=0;
+
+  int grank, gsize;
+  hlong gNVertsGlobal=0;
+  hlong gVoffsetL=0, gVoffsetU=0;
   
-  /*Multilevel Laplacian*/
+  /*Mesh data*/
+  dlong Nelements=0;
+  int dim=0;
+  int Nfaces=0;
+  int NelementVerts=0;
+  int NfaceVerts=0;
+  struct element_t {
+    dfloat EX[MAX_NVERTS]; //x coordinates of verts
+    dfloat EY[MAX_NVERTS]; //y coordinates of verts
+    dfloat EZ[MAX_NVERTS]; //z coordinates of verts
+    hlong V[MAX_NVERTS];   //Global Vertex Ids of verts
+
+    hlong E[MAX_NFACES];   //Global element ids of neighbors
+    int F[MAX_NFACES];     //Face ids of neighbors
+  } *elements=nullptr;
+
+  int faceVerts[MAX_NFACES*MAX_NFACEVERTS];
+
+  /*Multilevel Laplacian (for spectral partitioning)*/
   int Nlevels=0;
   mgLevel_t L[PARADOGS_MAX_LEVELS];
   coarseSolver_t coarseSolver;
 
-  graph_t() {};
-
+public:
   /*Build a graph from mesh connectivity info*/
-  graph_t(const dlong Nelements,
-          const int Nfaces,
-          const dlong* EToE,
-          const int* EToP,
-          MPI_Comm comm);
+  graph_t(const dlong _Nelements,
+          const int _dim,
+          const int _Nverts,
+          const int _Nfaces,
+          const int _NfaceVerts,
+          const int* _faceVerts,
+          const hlong EToV[],
+          const dfloat EX[],
+          const dfloat EY[],
+          const dfloat EZ[],
+          MPI_Comm _comm);
+
+  ~graph_t();
+
+  void InertialPartition();
+
+  void SpectralPartition();
+
+  void Connect();
+
+  void CuthillMckee();
+
+  void Report();
+
+  void ExtractMesh(dlong &Nelements_,
+                   hlong*  &EToV,
+                   hlong*  &EToE,
+                   int*    &EToF,
+                   dfloat* &EX,
+                   dfloat* &EY,
+                   dfloat* &EZ);
+
+private:
+  void InertialBipartition(const dfloat targetFraction[2]);
+  void SpectralBipartition(const dfloat targetFraction[2]);
 
 
   /*Divide graph into two pieces according to a bisection*/
-  void Split(const int partition[],
-             graph_t &graphL, dlong* &mapL,
-             graph_t &graphR, dlong* &mapR);
+  void Split(const int partition[]);
+
+  void CreateLaplacian();
 
   /*Compute Fiedler vector of graph */
   dfloat* FiedlerVector();

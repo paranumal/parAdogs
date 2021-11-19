@@ -25,42 +25,45 @@ SOFTWARE.
 */
 
 #include "parAdogs.hpp"
+#include "parAdogs/parAdogsGraph.hpp"
 #include "parAdogs/parAdogsMultigrid.hpp"
 
 namespace paradogs {
 
-/*Create graph Laplacian*/
-void mgLevel_t::CreateLaplacian(const dlong Nelements, 
-                                const int Nfaces,
-                                const dlong* EToE, 
-                                const int* EToP,
-                                MPI_Comm comm) {
+/*Create graph Laplacian from mesh data*/
+void graph_t::CreateLaplacian() {
+
+  Nlevels=1;
+  parCSR&A = L[0].A;
 
   /*Create a graph Laplacian from mesh info*/
-  A.Nrows = Nelements;
-  A.Ncols = Nelements;
-  A.diag.rowStarts = new dlong[Nelements+1];
+  A.Nrows = Nverts;
+  A.Ncols = Nverts;
+  A.diag.rowStarts = new dlong[Nverts+1];
 
   #pragma omp parallel for
-  for (dlong n=0;n<Nelements+1;++n) {
+  for (dlong n=0;n<Nverts+1;++n) {
     A.diag.rowStarts[n] = 0;
   }
 
   A.diag.nnz=0;
-  for (dlong e=0;e<Nelements;++e) {
+  for (dlong e=0;e<Nverts;++e) {
     A.diag.rowStarts[e+1]++; /*Count diagonal*/
     A.diag.nnz++;
 
     for (int n=0;n<Nfaces;++n) {
-      if (EToE[Nfaces*e + n]>-1) {
-        A.diag.rowStarts[e+1]++; /*count connections per vert*/
-        A.diag.nnz++;            /*count total connections*/
+      const hlong gE = elements[e].E[n];
+      if (gE!=-1) {
+        if (gE>=VoffsetL && gE<VoffsetU) {
+          A.diag.rowStarts[e+1]++; /*count connections per vert*/
+          A.diag.nnz++;            /*count total connections*/
+        }
       }
     }
   }
 
   /*cumulative sum*/
-  for (dlong e=0;e<Nelements;++e) {
+  for (dlong e=0;e<Nverts;++e) {
     A.diag.rowStarts[e+1] += A.diag.rowStarts[e];
   }
 
@@ -71,7 +74,7 @@ void mgLevel_t::CreateLaplacian(const dlong Nelements,
   A.diag.vals = new dfloat[A.diag.nnz];
 
   A.diag.nnz=0;
-  for (dlong e=0;e<Nelements;++e) {
+  for (dlong e=0;e<Nverts;++e) {
     A.diag.cols[A.diag.nnz] = e;
     dfloat& Ann = A.diag.vals[A.diag.nnz];
     A.diag.nnz++;
@@ -79,11 +82,14 @@ void mgLevel_t::CreateLaplacian(const dlong Nelements,
     Ann = 0.0;
 
     for (int n=0;n<Nfaces;++n) {
-      if (EToE[Nfaces*e + n]>-1) {
-        A.diag.cols[A.diag.nnz] = EToE[Nfaces*e + n];
-        A.diag.vals[A.diag.nnz] = -1.0;
-        A.diag.nnz++;
-        Ann += 1.0;
+      const hlong gE = elements[e].E[n];
+      if (gE!=-1) {
+        if (gE>=VoffsetL && gE<VoffsetU) {
+          A.diag.cols[A.diag.nnz] = static_cast<dlong>(gE-VoffsetL);
+          A.diag.vals[A.diag.nnz] = -1.0;
+          A.diag.nnz++;
+          Ann += 1.0;
+        }
       }
     }
     A.diagA[e] = Ann;
@@ -91,18 +97,18 @@ void mgLevel_t::CreateLaplacian(const dlong Nelements,
   }
 
   /*Construct fine null vector*/
-  null = new dfloat[Nelements];
+  L[0].null = new dfloat[Nverts];
 
   #pragma omp parallel for
-  for (dlong n=0;n<Nelements;++n) {
-    null[n] = 1.0/sqrt(Nelements);
+  for (dlong n=0;n<Nverts;++n) {
+    L[0].null[n] = 1.0/sqrt(Nverts);
   }
 
   /*Space for Fiedler*/
-  Fiedler = new dfloat[Nelements];
+  L[0].Fiedler = new dfloat[Nverts];
 
   /*Multigrid buffers*/
-  RES = new dfloat[Nelements];
+  L[0].RES = new dfloat[Nverts];
 }
 
 /*Split a graph Laplacian in two based on a partitioning*/

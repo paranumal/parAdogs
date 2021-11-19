@@ -136,7 +136,6 @@ mesh_t::~mesh_t() {
   if (EToV) {free(EToV); EToV=nullptr;}
   if (EToE) {free(EToE); EToE=nullptr;}
   if (EToF) {free(EToF); EToF=nullptr;}
-  if (EToP) {free(EToP); EToP=nullptr;}
   if (EX) {free(EX); EX=nullptr;}
   if (EY) {free(EY); EY=nullptr;}
   if (EZ) {free(EZ); EZ=nullptr;}

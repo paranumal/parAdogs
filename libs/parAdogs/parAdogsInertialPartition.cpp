@@ -27,64 +27,30 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsGraph.hpp"
 #include "parAdogs/parAdogsPartition.hpp"
-#include <algorithm>
-
-#ifdef GLIBCXX_PARALLEL_SORT
-#include <parallel/algorithm>
-using __gnu_parallel::sort;
-#else
-using std::sort;
-#endif
 
 namespace paradogs {
 
-struct keyVal_t {
-  dfloat key;
-  dlong val;
+/*************************************************/
+/* k-Way Recusive Inertial Partitioning          */
+/*************************************************/
+void graph_t::InertialPartition() {
 
-  keyVal_t() {};
-  keyVal_t(const dfloat _key, const dlong _val):
-    key{_key}, val{_val} {}
+  if (size==1) return;
 
-  friend bool operator<(const keyVal_t& a, const keyVal_t& b) {
-    return a.key < b.key;
-  }
-};
+  /*Determine size of left and right partitions*/
+  const int size0 = (size+1)/2;
+  // const int size1 = size-size0;
 
-/****************************************/
-/* Serial Multilevel Spectral Bisection */
-/****************************************/
-void Bipartition(graph_t& graph,
-                 const dfloat targetFraction[2],
-                 int partition[]) {
+  /*Set target */
+  dfloat bipartitionFraction[2] = {0.0, 0.0};
+  bipartitionFraction[0] = static_cast<dfloat>(size0)/size;
+  bipartitionFraction[1] = 1.0 - bipartitionFraction[0];
 
-  /*Create multilevel heirarchy*/
-  graph.MultigridSetup();
+  /*Bipartition and redistribute, update size*/
+  InertialBipartition(bipartitionFraction);
 
-  /*Compute Fiedler vector */
-  dfloat *Fiedler = graph.FiedlerVector();
-
-  /*Clear the coarse levels*/
-  graph.MultigridDestroy();
-
-  /*Use Fiedler vector to bipartion graph*/
-  keyVal_t *F = new keyVal_t[graph.Nverts];
-  for (dlong n=0;n<graph.Nverts;++n) {
-    F[n] = keyVal_t(Fiedler[n], n);
-  }
-
-  sort(F, F+graph.Nverts);
-
-  dlong Nverts0 = std::ceil(targetFraction[0]*graph.Nverts);
-
-  for (dlong n=0;n<Nverts0;++n) {
-    partition[F[n].val] = 0;
-  }
-  for (dlong n=Nverts0;n<graph.Nverts;++n) {
-    partition[F[n].val] = 1;
-  }
-
-  delete[] F;
+  /*Recursive call*/
+  InertialPartition();
 }
 
 }

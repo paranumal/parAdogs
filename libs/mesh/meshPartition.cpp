@@ -27,24 +27,30 @@ SOFTWARE.
 #include "mesh.hpp"
 #include "parAdogs.hpp"
 
-extern dfloat* gFiedler;
-
 void mesh_t::Partition(){
 
-	int* partition = new int[Nelements];
-
-	paradogs::PartitionMesh(Nelements, Nfaces, EToE, EToP, comm, partition);
+	paradogs::MeshInertialPartition(Nelements,
+																	dim,
+					                        Nverts,
+					                        Nfaces,
+					                        NfaceVertices,
+					                        faceVertices,
+					                        EToV,
+					                        EToE,
+					                        EToF,
+					                        EX,
+					                        EY,
+					                        EZ,
+					                        comm);
 
 	/*Plot the resulting partition*/
 	dfloat *q = new dfloat[Nelements*Nverts];
 
   for (dlong e=0;e<Nelements;e++)
 	  for (dlong n=0;n<Nverts;n++)
-	    q[n+e*Nverts] = partition[e];
-	    // q[n+e*Nverts] = gFiedler[e];
+	    q[n+e*Nverts] = rank;
 
   Plot(q);
 
   delete[] q;
-	delete[] partition;
 }

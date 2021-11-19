@@ -27,7 +27,7 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsGraph.hpp"
 
-#ifdef GLIBCXX_PARALLEL_SORT
+#ifdef GLIBCXX_PARALLEL
 #include <parallel/algorithm>
 using __gnu_parallel::sort;
 #else

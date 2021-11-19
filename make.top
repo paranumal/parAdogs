@@ -48,10 +48,35 @@ export LIBP_MPICC = mpicc
 export LIBP_MPICXX= mpic++
 export LIBP_LD    = mpic++
 
-export LIBP_CFLAGS=-O0 -fopenmp -g -Wall -Wshadow -Wno-unused-function
-export LIBP_MPICFLAGS=$(LIBP_CFLAGS)
+export LIBP_INCLUDES=-I${LIBP_INCLUDE_DIR} -I${OCCA_DIR}/include
+export LIBP_LIBS=${LIBP_BLAS_LIB} \
+                 ${LIBP_LAPACK_LIB} \
+                 -Wl,-rpath=$(OCCA_DIR)/lib -L$(OCCA_DIR)/lib -locca
 
-export LIBP_CXXFLAGS=-O0 -fopenmp -g -Wall -Wshadow -Wno-unused-function -std=c++11
+ifneq (,${debug})
+  export LIBP_CFLAGS=-O0 -g -Wall -Wshadow -Wno-unused-function -Wno-unknown-pragmas
+  export LIBP_CXXFLAGS=-O0 -g -Wall -Wshadow -Wno-unused-function -Wno-unknown-pragmas -std=c++11
+else
+  export LIBP_CFLAGS=-fopenmp -O3 -Wall -Wshadow -Wno-unused-function
+  export LIBP_CXXFLAGS=-fopenmp -O3 -Wall -Wshadow -Wno-unused-function -std=c++11
+endif
+
+ifeq (,${debug})
+  ifeq (GNU,${LIBP_ARCH})
+    LIBP_CXXFLAGS+= -mavx2 -ftree-vectorize -march=native -DGLIBCXX_PARALLEL
+    #-funroll-all-loops
+    #LIBP_LIBS+=-L/opt/apps/gcc5_2/atlas/3.10.2/lib/ -llapack -latlas  -lf77blas -lcblas -lptcblas -lptf77blas -lsatlas  -lgfortran  -L../../../libxsmm/lib -lxsmm -ldl
+  else ifeq (INTEL,${LIBP_ARCH})
+    LIBP_CXXFLAGS+= -funroll-loops -xHost
+    LIBP_LIBS+=-L/opt/apps/intel15_3/mkl/11.2.3/lib/intel64  -lmkl_rt
+    #  -fopt-info-vec-missed  -fopt-info
+    #-fopt-info
+  else
+    $(error unknown arch for [LIBP_ARCH] specified)
+  endif
+endif
+
+export LIBP_MPICFLAGS=$(LIBP_CFLAGS)
 export LIBP_MPICXXFLAGS=$(LIBP_CXXFLAGS)
 
 ifeq (1,${LIBP_COVERAGE})
@@ -59,25 +84,10 @@ export LIBP_CXXFLAGS+=--coverage
 export LIBP_MPICXXFLAGS+=--coverage
 endif
 
-export LIBP_LIBS=${LIBP_BLAS_LIB} \
-                 ${LIBP_LAPACK_LIB} \
-                 -Wl,-rpath=$(OCCA_DIR)/lib -L$(OCCA_DIR)/lib -locca
-
-export LIBP_DEFINES=
-
-export LIBP_INCLUDES=-I${LIBP_INCLUDE_DIR} -I${OCCA_DIR}/include
-
-ifeq (GNU,${LIBP_ARCH})
-#   LIBP_CXXFLAGS+= -mavx2 -ftree-vectorize -march=native -DGLIBCXX_PARALLEL_SORT
-  #-funroll-all-loops
-  #LIBP_LIBS+=-L/opt/apps/gcc5_2/atlas/3.10.2/lib/ -llapack -latlas  -lf77blas -lcblas -lptcblas -lptf77blas -lsatlas  -lgfortran  -L../../../libxsmm/lib -lxsmm -ldl
-else ifeq (INTEL,${LIBP_ARCH})
-  LIBP_CXXFLAGS+= -funroll-loops -xHost
-  LIBP_LIBS+=-L/opt/apps/intel15_3/mkl/11.2.3/lib/intel64  -lmkl_rt
-  #  -fopt-info-vec-missed  -fopt-info
-  #-fopt-info
+ifneq (,${debug})
+  export LIBP_DEFINES=-DLIBP_DEBUG
 else
-  $(error unknown arch for [LIBP_ARCH] specified)
+  export LIBP_DEFINES=
 endif
 
 export OBJ_COLOR = \033[0;36m

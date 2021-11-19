@@ -70,14 +70,8 @@ mesh_t& mesh_t::Setup(platform_t& platform, meshSettings_t& settings,
     mesh->ParallelReader(fileName.c_str());
   }
 
-  // connect elements using parallel sort
-  mesh->ParallelConnect();
-
   // partition mesh among processes
   mesh->Partition();
-
-  // print out connectivity statistics
-  mesh->PrintPartitionStatistics();
 
   return *mesh;
 }

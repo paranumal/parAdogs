@@ -30,8 +30,11 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsDefines.h"
 #include "ogs.hpp"
+#include <random>
 
 namespace paradogs {
+
+extern std::mt19937 RNG;
 
 struct nonZero_t {
   hlong row;

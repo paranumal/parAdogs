@@ -29,26 +29,12 @@ SOFTWARE.
 
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsGraph.hpp"
-#include <random>
 
 namespace paradogs {
 
-extern std::mt19937 RNG;
+dfloat ParallelPivot(const dlong N, dfloat F[],
+                     const hlong k, MPI_Comm comm);
 
-void Partition(graph_t& graph,
-               const int Nparts,
-               const dfloat targetFraction[],
-               int partition[]);
-
-void FiedlerVector(graph_t& graph,
-                   dfloat Fiedler[]);
-
-void Refine(graph_t& graph,
-            dfloat F[]);
-
-void Bipartition(graph_t& graph,
-                 const dfloat targetFraction[2],
-                 int partition[]);
 }
 
 #endif

@@ -69,9 +69,8 @@ public:
   dlong Nelements=0;       //local element count
   hlong NelementsGlobal=0; //global element count
   hlong *EToV=nullptr; // element-to-vertex connectivity
-  dlong *EToE=nullptr; // element-to-element connectivity
+  hlong *EToE=nullptr; // element-to-element connectivity
   int   *EToF=nullptr; // element-to-(local)face connectivity
-  int   *EToP=nullptr; // element-to-partition/process connectivity
   int   *EToB=nullptr; // element-to-boundary condition type
 
   hlong *elementInfo=nullptr; //type of element
@@ -102,13 +101,6 @@ public:
 
   // repartition elements
   void Partition();
-
-  /* build parallel face connectivity */
-  void ParallelConnect();
-  void Connect();
-
-  // print out parallel partition i
-  void PrintPartitionStatistics();
 
   void Plot(const dfloat* q);
 };

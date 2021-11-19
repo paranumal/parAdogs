@@ -31,8 +31,9 @@ void mesh_t::Plot(const dfloat* q){
 
   FILE *fp;
 
-  string fname = "mesh.vtu";
-  const char* fileName = fname.c_str();
+  char fileName[BUFSIZ];
+  sprintf(fileName, "mesh_%04d.vtu", rank);
+
   fp = fopen(fileName, "w");
 
   fprintf(fp, "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"BigEndian\">\n");

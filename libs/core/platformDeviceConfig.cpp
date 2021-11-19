@@ -107,10 +107,16 @@ void platform_t::DeviceConfig(){
   if (!pipeCores || !pipeSockets) {
     LIBP_ABORT("popen() failed!");
   }
+
   std::array<char, 128> buffer;
-  fgets(buffer.data(), buffer.size(), pipeCores);
+  if (!fgets(buffer.data(), buffer.size(), pipeCores)) { //read to end of line
+    LIBP_ABORT("Error reading core count")
+  }
   int Ncores = std::stoi(buffer.data());
-  fgets(buffer.data(), buffer.size(), pipeSockets);
+
+  if (!fgets(buffer.data(), buffer.size(), pipeSockets)) { //read to end of line
+    LIBP_ABORT("Error reading core count")
+  }
   int Nsockets = std::stoi(buffer.data());
 
   pclose(pipeCores);
@@ -125,12 +131,14 @@ void platform_t::DeviceConfig(){
     LIBP_WARNING(ss.str());
     Nthreads = 1;
   }
+#if !defined(LIBP_DEBUG)
   omp_set_num_threads(Nthreads);
   // omp_set_num_threads(1);
 
   // if (settings.compareSetting("VERBOSE","TRUE"))
-    printf("Rank %d: Nsockets = %d, NcoresPerSocket = %d, Nthreads = %d, device_id = %d \n",
-           rank, Nsockets, Ncores, Nthreads, device_id);
+    // printf("Rank %d: Nsockets = %d, NcoresPerSocket = %d, Nthreads = %d, device_id = %d \n",
+    //        rank, Nsockets, Ncores, Nthreads, device_id);
+#endif
 
   device.setup(mode);
 

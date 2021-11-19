@@ -58,8 +58,7 @@ public:
   /*Create graph Laplacian*/
   void CreateLaplacian(const dlong Nelements,
                        const int Nfaces,
-                       const dlong* EToE,
-                       const int* EToP,
+                       const hlong EToE[],
                        MPI_Comm comm);
 
   /*Split a graph Laplacian in two based on a partitioning*/
