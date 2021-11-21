@@ -27,20 +27,21 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsMatrix.hpp"
 #include "parAdogs/parAdogsPartition.hpp"
+#include <random>
 
 namespace paradogs {
 
+extern std::mt19937 RNG;
+
 /*Create a vertex matching using distance-2 aggregation*/
 void parCSR::Aggregate(dlong& Nc,
-                       dlong FineToCoarse[]) {
-
-  /*Stength threashold*/
-  const dfloat theta=0.08;
+                       const dfloat theta,
+                       hlong FineToCoarse[]) {
 
   /*Create rng*/
   std::uniform_real_distribution<> distrib(-0.25, 0.25);
 
-  parCSR strong(Nrows, Ncols);
+  parCSR strong(Nrows, Ncols, platform, comm);
   strong.diag.rowStarts = new dlong[Nrows+1];
 
   #pragma omp parallel for
@@ -61,21 +62,21 @@ void parCSR::Aggregate(dlong& Nc,
       const dlong col = diag.cols[jj];
       if (col==i) continue;
 
-      const dfloat Ajj = diagA[col];
+      const dfloat Ajj = std::abs(diagA[col]);
 
       if(std::abs(diag.vals[jj]) > theta*(sqrt(Aii*Ajj)))
         strong_per_row++;
     }
     //non-local entries
-    // Jstart = A->offd.rowStarts[i];
-    // Jend   = A->offd.rowStarts[i+1];
-    // for(dlong jj= Jstart; jj<Jend; jj++){
-    //   const dlong col = A->offd.cols[jj];
-    //   const dfloat Ajj = fabs(diagA[col]);
+    Jstart = offd.rowStarts[i];
+    Jend   = offd.rowStarts[i+1];
+    for(dlong jj= Jstart; jj<Jend; jj++){
+      const dlong col = offd.cols[jj];
+      const dfloat Ajj = std::abs(diagA[col]);
 
-    //   if(fabs(A->offd.vals[jj]) > theta*(sqrt(Aii*Ajj)))
-    //     strong_per_row++;
-    // }
+      if(std::abs(offd.vals[jj]) > theta*(sqrt(Aii*Ajj)))
+        strong_per_row++;
+    }
 
     strong.diag.rowStarts[i+1] = strong_per_row;
   }
@@ -102,7 +103,7 @@ void parCSR::Aggregate(dlong& Nc,
       const dlong col = diag.cols[jj];
       if (col==i) continue;
 
-      const dfloat Ajj = diagA[col];
+      const dfloat Ajj = std::abs(diagA[col]);
 
       if(std::abs(diag.vals[jj]) > theta*(sqrt(Aii*Ajj))) {
         strong.diag.cols[counter] = col;
@@ -110,30 +111,32 @@ void parCSR::Aggregate(dlong& Nc,
       }
     }
     //non-local entries
-    // Jstart = A->offd.rowStarts[i];
-    // Jend   = A->offd.rowStarts[i+1];
-    // for(dlong jj= Jstart; jj<Jend; jj++){
-    //   const dlong col = A->offd.cols[jj];
+    Jstart = offd.rowStarts[i];
+    Jend   = offd.rowStarts[i+1];
+    for(dlong jj= Jstart; jj<Jend; jj++){
+      const dlong col = offd.cols[jj];
 
-    //   const dfloat Ajj = fabs(diagA[col]);
+      const dfloat Ajj = std::abs(diagA[col]);
 
-    //   if(fabs(A->offd.vals[jj]) > theta*(sqrt(Aii*Ajj)))
-    //     strong.cols[counter++] = col;
-    // }
+      if(std::abs(offd.vals[jj]) > theta*(sqrt(Aii*Ajj))) {
+        strong.diag.cols[counter] = col;
+        strong.diag.vals[counter++] = std::abs(offd.vals[jj]) + distrib(paradogs::RNG);
+      }
+    }
   }
 
-  int  *state = new int[Nrows];
-  float* rand = new float[Nrows];
-  int   *Ts = new int[Nrows];
-  float *Tr = new float[Nrows];
-  dlong *Tn = new dlong[Nrows];
+  int   *state = new int[Ncols];
+  float *rand  = new float[Ncols];
+  int   *Ts = new int[Ncols];
+  float *Tr = new float[Ncols];
+  hlong *Tn = new hlong[Ncols];
 
   /*Initialize state array*/
   /*  0 - Undecided */
   /* -1 - Not MIS */
   /*  1 - MIS */
   #pragma omp parallel for
-  for (dlong n=0;n<Nrows;++n) state[n] = 0;
+  for (dlong n=0;n<Ncols;++n) state[n] = 0;
 
   /*Use vertex degree with random noise to break ties*/
   // #pragma omp parallel for
@@ -142,6 +145,9 @@ void parCSR::Aggregate(dlong& Nc,
               - strong.diag.rowStarts[n]
               + distrib(paradogs::RNG);
   }
+
+  //fill halo region
+  halo->Exchange(rand, 1, ogs::Float);
 
   do {
     // first neighbours
@@ -152,24 +158,30 @@ void parCSR::Aggregate(dlong& Nc,
       if (smax==1) continue;
 
       float  rmax = rand[n];
-      dlong  nmax = n;
+      hlong  nmax = colMap[n];
 
       for(dlong j=strong.diag.rowStarts[n];j<strong.diag.rowStarts[n+1];j++){
         const dlong k  = strong.diag.cols[j];
         const int   sk = state[k];
         const float rk = rand[k];
+        const hlong nk = colMap[k];
         if ((sk>smax)              || /*If neighbor is MIS node*/
            ((sk==smax)&&(rk>rmax)) || /*Else if it has a bigger weight*/
-           ((sk==smax)&&(rk==rmax)&&(k>nmax))) { /*Rare, but just in case, break tie with index number*/
+           ((sk==smax)&&(rk==rmax)&&(nk>nmax))) { /*Rare, but just in case, break tie with index number*/
           smax = sk;
           rmax = rk;
-          nmax = k;
+          nmax = nk;
         }
       }
       Ts[n] = smax;
       Tr[n] = rmax;
       Tn[n] = nmax;
     }
+
+    //share results
+    halo->Exchange(Ts, 1, ogs::Int32);
+    halo->Exchange(Tr, 1, ogs::Float);
+    halo->Exchange(Tn, 1, ogs::Hlong);
 
     // second neighbours
     #pragma omp parallel for
@@ -178,7 +190,7 @@ void parCSR::Aggregate(dlong& Nc,
 
       int   smax = Ts[n];
       float rmax = Tr[n];
-      dlong nmax = Tn[n];
+      hlong nmax = Tn[n];
 
       for(dlong j=strong.diag.rowStarts[n];j<strong.diag.rowStarts[n+1];j++){
         const dlong k = strong.diag.cols[j];
@@ -196,15 +208,19 @@ void parCSR::Aggregate(dlong& Nc,
 
       // if I am the strongest among all the 1 and 2 ring neighbours
       // I am an MIS node
-      if(nmax == n) state[n] = 1;
+      if(nmax == colMap[n]) state[n] = 1;
 
       // if there is an MIS node within distance 2, I am removed
       if(smax>0) state[n] = -1;
     }
 
+    //share results
+    halo->Exchange(state, 1, ogs::Int32);
+
     // if number of undecided nodes = 0, algorithm terminates
-    dlong cnt = 0;
+    hlong cnt = 0;
     for (dlong n=0;n<Nrows;n++) if (state[n]==0) cnt++;
+    MPI_Allreduce(MPI_IN_PLACE,&cnt,1,MPI_HLONG,MPI_SUM,comm);
 
     if (cnt==0) break;
 
@@ -212,19 +228,34 @@ void parCSR::Aggregate(dlong& Nc,
 
   delete[] Tr;
   delete[] Tn;
-  delete[] rand;
+
+
+  // count the coarse nodes/aggregates
+  Nc=0;
+  for(dlong i=0; i<Nrows; i++)
+    if(state[i] == 1) Nc++;
+
+  /*Get global offsets*/
+  hlong localNc=static_cast<hlong>(Nc);
+  hlong NcOffsetL=0, NcOffsetU=0;
+  MPI_Scan(&localNc, &NcOffsetU, 1, MPI_HLONG, MPI_SUM, comm);
+  NcOffsetL = NcOffsetU-Nc;
 
   /*Initialize Matching array*/
   Nc=0;
   for(dlong i=0; i<Nrows; i++) {
     if(state[i] == 1) {
       Ts[i] = 1;
-      FineToCoarse[i] = Nc++;
+      FineToCoarse[i] = NcOffsetL+Nc++;
     } else {
       Ts[i] = -1;
       FineToCoarse[i] = -1;
     }
   }
+
+  //share the initial aggregate flags
+  halo->Exchange(Ts, 1, ogs::Int32);
+  halo->Exchange(FineToCoarse, 1, ogs::Hlong);
 
   // first neighbours
   #pragma omp parallel for
@@ -244,34 +275,42 @@ void parCSR::Aggregate(dlong& Nc,
     }
   }
 
+  halo->Exchange(Ts, 1, ogs::Int32);
+  halo->Exchange(FineToCoarse, 1, ogs::Hlong);
+
   // second neighbours
   #pragma omp parallel for
   for(dlong n=0; n<Nrows; n++){
     if (FineToCoarse[n]==-1) { //If we're still undecided
-      int   smax = -1;
+      hlong cmax = -1;
       float rmax = -1.0;
-      dlong kmax = -1;
+      hlong kmax = -1;
 
       for(dlong j=strong.diag.rowStarts[n];j<strong.diag.rowStarts[n+1];j++){
         const dlong k = strong.diag.cols[j];
         const int   sk = Ts[k];
+        const hlong nk = colMap[k];
         if (sk!=-1) { /*If the neighbor is in the neighborhood of an MIS node*/
-          // const float rk = rand[k];
-          const float rk = strong.diag.vals[j];
+          const float rk = rand[k];
+          // const float rk = strong.diag.vals[j];
           if( (rk>rmax)            || /*If edge is strongest*/
-             ((rk==rmax)&&(k>kmax))) { /*Rare, but just in case, break tie with index number*/
-            smax = FineToCoarse[k];
+             ((rk==rmax)&&(nk>kmax))) { /*Rare, but just in case, break tie with index number*/
+            cmax = FineToCoarse[k];
             rmax = rk;
-            kmax = k;
+            kmax = nk;
           }
         }
       }
-      FineToCoarse[n] = smax;
+      FineToCoarse[n] = cmax;
     }
   }
 
+  //share results
+  halo->Exchange(FineToCoarse, 1, ogs::Hlong);
+
   delete[] Ts;
   delete[] state;
+  delete[] rand;
 }
 
 }

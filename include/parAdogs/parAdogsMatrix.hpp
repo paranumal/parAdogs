@@ -30,11 +30,8 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsDefines.h"
 #include "ogs.hpp"
-#include <random>
 
 namespace paradogs {
-
-extern std::mt19937 RNG;
 
 struct nonZero_t {
   hlong row;
@@ -45,8 +42,15 @@ struct nonZero_t {
 
 class parCSR {
 public:
+  platform_t& platform;
+  MPI_Comm comm;
+
   dlong Nrows=0;
   dlong Ncols=0;
+
+  //partition info
+  hlong rowOffsetL=0, rowOffsetU=0;
+  hlong colOffsetL=0, colOffsetU=0;
 
   //local sparse matrix
   struct CSR {
@@ -73,27 +77,23 @@ public:
   dfloat *diagA=nullptr;
   dfloat *diagInv=nullptr;
 
-  //partition info
-  hlong *globalRowStarts=nullptr;
-  hlong *globalColStarts=nullptr;
-  hlong *colMap=nullptr;
-
-  ogs::halo_t *halo = nullptr;
+  /*communcation info*/
   dlong NlocalCols = 0;
+  ogs::halo_t *halo = nullptr;
+  hlong *colMap=nullptr;
 
   //rho ~= cond(invD * A)
   dfloat rho=0.0;
 
-  parCSR() {};
-  parCSR(dlong N, dlong M): Nrows(N), Ncols(M) {}
+  parCSR(dlong N, dlong M, platform_t& _platform, MPI_Comm _comm):
+    platform(_platform), comm(_comm), Nrows(N), Ncols(M) {}
 
   //build a parCSR matrix from a distributed COO matrix
   parCSR(dlong _Nrows, dlong _Ncols,
          const dlong NNZ,
-         nonZero_t entries[]);
-
-  /*Assignment - Copy & swap idiom*/
-  parCSR& operator=(parCSR A);
+         nonZero_t entries[],
+         platform_t &_platform,
+         MPI_Comm comm);
 
   ~parCSR() {Free();}
   void Free();
@@ -105,7 +105,8 @@ public:
 
   /*Aggregate via distance-2 PMIS*/
   void Aggregate(dlong& cNverts,
-                 dlong FineToCoarse[]);
+                 const dfloat theta,
+                 hlong FineToCoarse[]);
 
   void GalerkinProduct(const parCSR &A, const parCSR &P);
 

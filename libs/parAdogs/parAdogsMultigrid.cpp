@@ -59,6 +59,7 @@ void graph_t::MultigridVcycle(const int l,
 
   // Recursive call
   MultigridVcycle(l+1, rC, xC);
+  // for (int n=0;n<Lc.Nrows;++n) xC[n] = rC[n];
 
   // x = x + P xC
   Lf.Prolongate(xC, x);
@@ -68,22 +69,22 @@ void graph_t::MultigridVcycle(const int l,
 }
 
 void mgLevel_t::Residual(dfloat r[], dfloat x[], dfloat res[]) {
-  A.SpMV(-1.0, x, 1.0, r, res);
+  A->SpMV(-1.0, x, 1.0, r, res);
 }
 
 void mgLevel_t::Coarsen(dfloat x[], dfloat xC[]) {
-  R.SpMV(1.0, x, 0.0, xC);
+  R->SpMV(1.0, x, 0.0, xC);
 }
 
 void mgLevel_t::Prolongate(dfloat xC[], dfloat x[]) {
-  P.SpMV(1.0, xC, 1.0, x);
+  P->SpMV(1.0, xC, 1.0, x);
 }
 
 void mgLevel_t::Smooth(dfloat r[], dfloat x[], const bool xIsZero) {
   const int ChebyshevIterations=2;
-  A.SmoothChebyshev(r, x, lambda0, lambda1,
-                    xIsZero, scratch,
-                    ChebyshevIterations);
+  A->SmoothChebyshev(r, x, lambda0, lambda1,
+                     xIsZero, scratch,
+                     ChebyshevIterations);
 }
 
 

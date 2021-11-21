@@ -35,8 +35,11 @@ namespace paradogs {
 
 class mgLevel_t {
 public:
+  dlong Nrows=0, Ncols=0;
+  hlong Nglobal=0;
+
   // parCSR A, P, R;
-  parCSR A, R, P;
+  parCSR *A=nullptr, *R=nullptr, *P=nullptr;
 
   /*null vector*/
   dfloat *null=nullptr;
@@ -61,15 +64,12 @@ public:
                        const hlong EToE[],
                        MPI_Comm comm);
 
-  /*Split a graph Laplacian in two based on a partitioning*/
-  void SplitLaplacian(const int partition[],
-                      mgLevel_t &L, dlong mapL[],
-                      mgLevel_t &R, dlong mapR[]);
-
   /*Construct a coarse level*/
-  void CoarsenLevel(mgLevel_t &Lf);
+  void CoarsenLevel(mgLevel_t &Lf, const dfloat theta);
 
   void SetupSmoother();
+
+  void AllocateScratch(const int l);
 
   /*Compute Fiedler vector directly*/
   void FiedlerVector();
@@ -81,42 +81,41 @@ public:
   void Prolongate(dfloat xC[], dfloat x[]);
 };
 
-parCSR TentativeProlongator(const dlong Nf,
-                            const dlong Nc,
-                            dlong FineToCoarse[],
-                            dfloat FineNull[],
-                            dfloat CoarseNull[]);
+parCSR* TentativeProlongator(const dlong Nf,
+                             const dlong Nc,
+                             platform_t& platform,
+                             MPI_Comm comm,
+                             hlong FineToCoarse[],
+                             dfloat FineNull[],
+                             dfloat *CoarseNull[]);
 
-parCSR SmoothProlongator(const parCSR& A,
-                         const parCSR& T);
+parCSR* SmoothProlongator(const parCSR* A,
+                          const parCSR* T);
 
-parCSR Transpose(const parCSR& A);
+parCSR* Transpose(const parCSR* A);
 
-parCSR SpMM(const parCSR& A, const parCSR& B);
+parCSR* SpMM(const parCSR* A, const parCSR* B);
 
 class coarseSolver_t {
 
 public:
+  MPI_Comm comm;
+
+  int N=0;
   int Nrows=0;
   int Ncols=0;
 
   int coarseTotal=0;
-  int coarseOffset=0;
-  int *coarseOffsets=nullptr;
   int *coarseCounts=nullptr;
-  int *sendOffsets=nullptr;
-  int *sendCounts=nullptr;
+  int *coarseOffsets=nullptr;
 
-  int N=0;
-  int offdTotal=0;
-
-  dfloat *diagInvA=nullptr, *offdInvA=nullptr;
-  dfloat *diagRhs=nullptr, *offdRhs=nullptr;
+  dfloat *invA=nullptr;
+  dfloat *grhs=nullptr;
 
   ~coarseSolver_t() {Free();}
   void Free();
 
-  void Setup(parCSR &A, dfloat null[]);
+  void Setup(parCSR* A, dfloat null[]);
   void Solve(dfloat r[], dfloat x[]);
 };
 

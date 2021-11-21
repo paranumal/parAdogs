@@ -145,6 +145,9 @@ void graph_t::CuthillMckee() {
       pe = static_cast<dlong>(newId[e]-gVoffsetL);
     }
   }
+
+  delete[] visited;
+  delete[] newId;
 }
 
 }

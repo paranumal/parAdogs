@@ -45,14 +45,12 @@ dfloat* graph_t::FiedlerVector() {
   /*Project and improve the Fiedler vector to the fine level*/
   for (int l=Nlevels-2;l>=0;--l) {
     /*Prolongate Fiedler vector to fine graph*/
-    L[l].P.SpMV(1.0, L[l+1].Fiedler, 0.0, L[l].Fiedler);
+    L[l].P->SpMV(1.0, L[l+1].Fiedler, 0.0, L[l].Fiedler);
 
     /*Refine the Fiedler vector*/
     Refine(l);
   }
 
-  // gFiedler = new dfloat[Nverts];
-  // for (dlong n=0;n<Nverts;++n) gFiedler[n] = L[0].Fiedler[n];
   return L[0].Fiedler;
 }
 
@@ -61,33 +59,87 @@ dfloat* graph_t::FiedlerVector() {
 /*Compute Fiedler vector of graph Laplacian*/
 void mgLevel_t::FiedlerVector() {
 
-  int N = A.Nrows;
+  const int N = static_cast<int>(A->Nrows);
 
-  /*Create full matrix from sparse csr*/
-  double *M = new double[N*N];
-  for (int n=0;n<N*N;++n) M[n] = 0.0;
+  int size;
+  MPI_Comm_size(A->comm, &size);
+  int* counts = new int[size];
+  int* offsets = new int[size];
 
-  for (dlong n=0;n<N;++n) {
-    const dlong start=A.diag.rowStarts[n];
-    const dlong end=A.diag.rowStarts[n+1];
-    for (dlong j=start;j<end;++j) {
-      M[n*N+A.diag.cols[j]] = A.diag.vals[j];
+  //collect partitioning info
+  MPI_Allgather(    &N, 1, MPI_INT,
+                counts, 1, MPI_INT, A->comm);
+
+  int Ntotal=0;
+  for (int r=0;r<size;++r) {
+    Ntotal+=counts[r];
+  }
+  offsets[0]=0;
+  for (int r=1;r<size;++r) {
+    offsets[r]= offsets[r-1] + counts[r-1];
+  }
+
+  //populate local dense matrix
+  dfloat *localA = new dfloat[N*Ntotal];
+
+  #pragma omp parallel for
+  for (int n=0;n<N;n++) {
+    for (int m=0;m<Ntotal;m++) {
+      localA[n*Ntotal+m] = 0;
     }
   }
+
+  /*Add sparse entries*/
+  #pragma omp parallel for
+  for (int n=0;n<N;n++) {
+    const int start = static_cast<int>(A->diag.rowStarts[n]);
+    const int end   = static_cast<int>(A->diag.rowStarts[n+1]);
+    for (int m=start;m<end;m++) {
+      const int col = static_cast<int>(A->diag.cols[m] + A->colOffsetL);
+      localA[n*Ntotal+col] += A->diag.vals[m];
+    }
+  }
+  #pragma omp parallel for
+  for (int n=0;n<A->offd.nzRows;n++) {
+    const int row   = static_cast<int>(A->offd.rows[n]);
+    const int start = static_cast<int>(A->offd.mRowStarts[n]);
+    const int end   = static_cast<int>(A->offd.mRowStarts[n+1]);
+    for (int m=start;m<end;m++) {
+      const int col = static_cast<int>(A->colMap[A->offd.cols[m]]);
+      localA[row*Ntotal+col] += A->offd.vals[m];
+    }
+  }
+
+  //assemble the full matrix
+  dfloat *M = new dfloat[Ntotal*Ntotal];
+
+  for (int r=0;r<size;++r) {
+    counts[r] *= Ntotal;
+    offsets[r] *= Ntotal;
+  }
+
+  MPI_Allgatherv(localA, N*Ntotal, MPI_DFLOAT,
+                 M, counts, offsets, MPI_DFLOAT,
+                 A->comm);
+
+  MPI_Barrier(A->comm);
+  delete[] localA;
+  delete[] counts;
+  delete[] offsets;
 
   /*Call LaPack to find eigen pairs*/
   int INFO = -999;
   char JOBZ='V';
   char UPLO='L';
   int LWORK = -1;
-  int LDA = N;
+  int LDA = Ntotal;
   double WORKSIZE=0.0;
-  double *W= new double[N];
-  dsyev_(&JOBZ, &UPLO, &N, M, &LDA, W, &WORKSIZE, &LWORK, &INFO); //Size query
+  double *W= new double[Ntotal];
+  dsyev_(&JOBZ, &UPLO, &Ntotal, M, &LDA, W, &WORKSIZE, &LWORK, &INFO); //Size query
 
   LWORK = int(WORKSIZE);
   double *WORK= new double[LWORK];
-  dsyev_(&JOBZ, &UPLO, &N, M, &LDA, W, WORK, &LWORK, &INFO);
+  dsyev_(&JOBZ, &UPLO, &Ntotal, M, &LDA, W, WORK, &LWORK, &INFO);
   delete[] WORK;
 
   if(INFO) {
@@ -101,7 +153,7 @@ void mgLevel_t::FiedlerVector() {
   double min1 = std::numeric_limits<double>::max();
   int minloc0 = -1;
   int minloc1 = -1;
-  for (int i=0;i<N;++i) {
+  for (int i=0;i<Ntotal;++i) {
     // printf("Eig[%d] = %f\n", i, W[i]);
 
     if (W[i]<min0) {
@@ -117,9 +169,9 @@ void mgLevel_t::FiedlerVector() {
 
   // printf("min1 = %f, minloc1 = %d \n", min1, minloc1);
 
-  double* minV = M + minloc1*N;
+  double* minV = M + minloc1*Ntotal;
   for (int i=0;i<N;++i) {
-    Fiedler[i] = minV[i];
+    Fiedler[i] = minV[i+A->rowOffsetL];
   }
 
   // Fiedler vector is already orthogonal to null
@@ -127,7 +179,9 @@ void mgLevel_t::FiedlerVector() {
   /* Fiedler vector is probably already normalized, but just in case */
   dfloat norm = 0.0;
   for (dlong n=0;n<N;++n) norm += Fiedler[n]*Fiedler[n];
+  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, A->comm);
   norm = sqrt(norm);
+
   for (dlong n=0;n<N;++n) Fiedler[n] /= norm;
 
   delete[] W;

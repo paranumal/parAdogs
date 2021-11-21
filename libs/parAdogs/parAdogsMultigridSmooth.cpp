@@ -59,8 +59,6 @@ void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
 
   } else {
     //r = D^{-1}(b-A*x)
-    // halo->ExchangeStart(o_x, 1, ogs::Dfloat);
-
     #pragma omp parallel for
     for (dlong n=0;n<Nrows;++n) {
 
@@ -75,13 +73,22 @@ void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
       r[n] = diagInv[n]*rn;
     }
 
-    // halo->ExchangeFinish(o_x, 1, ogs::Dfloat);
+    halo->Exchange(x, 1, ogs::Dfloat);
 
-    // if (offd.NrowBlocks)
-    //   SmoothChebyshevMCSRKernel(offd.NrowBlocks,
-    //                  offd.o_blockRowStarts, offd.o_mRowStarts,
-    //                  offd.o_rows, offd.o_cols, offd.o_vals,
-    //                  o_diagInv, o_x, o_r);
+    #pragma omp parallel for
+    for(dlong n=0; n<offd.nzRows; n++){ //local
+
+      dfloat rn = 0.0;
+
+      const dlong row = offd.rows[n];
+      const dlong start = offd.mRowStarts[n];
+      const dlong end   = offd.mRowStarts[n+1];
+      for(dlong j=start; j<end; ++j) {
+        rn -= offd.vals[j]*x[offd.cols[j]];
+      }
+
+      r[row] += diagInv[row]*rn;
+    }
 
     const int last_it = (ChebyshevIterations==0) ? 1 : 0;
 
@@ -104,8 +111,6 @@ void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
   for (int k=0;k<ChebyshevIterations;k++) {
 
     //r_k+1 = r_k - D^{-1}Ad_k
-    // halo->ExchangeStart(o_d, 1, ogs::Dfloat);
-
     #pragma omp parallel for
     for (dlong n=0;n<Nrows;++n) {
 
@@ -120,13 +125,22 @@ void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
       r[n] += diagInv[n]*rn;
     }
 
-    // halo->ExchangeFinish(o_d, 1, ogs::Dfloat);
+    halo->Exchange(d, 1, ogs::Dfloat);
 
-    // if (offd.NrowBlocks)
-    //   SmoothChebyshevMCSRKernel(offd.NrowBlocks,
-    //                  offd.o_blockRowStarts, offd.o_mRowStarts,
-    //                  offd.o_rows, offd.o_cols, offd.o_vals,
-    //                  o_diagInv, o_d, o_r);
+    #pragma omp parallel for
+    for(dlong n=0; n<offd.nzRows; n++){ //local
+
+      dfloat rn = 0.0;
+
+      const dlong row = offd.rows[n];
+      const dlong start = offd.mRowStarts[n];
+      const dlong end   = offd.mRowStarts[n+1];
+      for(dlong j=start; j<end; ++j) {
+        rn -= offd.vals[j]*d[offd.cols[j]];
+      }
+
+      r[row] += diagInv[row]*rn;
+    }
 
     const int last_it = (k==ChebyshevIterations-1) ? 1 : 0;
 

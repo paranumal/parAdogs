@@ -33,80 +33,24 @@ namespace paradogs {
 /*************************************************/
 /* k-Way Recusive Spectral Partitioning          */
 /*************************************************/
-
 void graph_t::SpectralPartition() {
 
-  const int Nparts=size;
-
-  if (Nparts==1) return;
+  if (size==1) return;
 
   /*Determine size of left and right partitions*/
-  const int NpartsL = (Nparts+1)/2;
-  const int NpartsR = Nparts-NpartsL;
+  const int size0 = (size+1)/2;
+  // const int size1 = size-size0;
 
   /*Set target */
   dfloat bipartitionFraction[2] = {0.0, 0.0};
-  bipartitionFraction[0] = static_cast<dfloat>(NpartsL)/Nparts;
+  bipartitionFraction[0] = static_cast<dfloat>(size0)/size;
   bipartitionFraction[1] = 1.0 - bipartitionFraction[0];
 
+  /*Bipartition and redistribute, update size*/
   SpectralBipartition(bipartitionFraction);
 
-  // if (Nparts>2) {
-  //   /*Split graph according to partitioning*/
-  //   graph_t graphL, graphR;
-  //   dlong *mapL, *mapR;
-
-  //   graph.Split(partition,
-  //               graphL, mapL,
-  //               graphR, mapR);
-
-  //   /*Recursive calls*/
-  //   if (NpartsL>1) {
-  //     int* partitionL = new int[graphL.Nverts];
-  //     dfloat *targetFractionL = new dfloat[NpartsL];
-
-  //     for (int n=0;n<NpartsL;++n) {
-  //       targetFractionL[n] = targetFraction[n]/bisectionFraction[0];
-  //     }
-
-  //     SpectralPartition(graphL, NpartsL, targetFractionL, partitionL);
-
-  //     /*Inject partitioning*/
-  //     for (dlong n=0;n<graphL.Nverts;++n){
-  //       partition[mapL[n]] = partitionL[n];
-  //     }
-
-  //     delete[] targetFractionL;
-  //     delete[] partitionL;
-  //   }
-
-  //   if (NpartsR>1) {
-  //     int* partitionR = new int[graphR.Nverts];
-  //     dfloat *targetFractionR = new dfloat[NpartsR];
-
-  //     for (int n=0;n<NpartsR;++n) {
-  //       targetFractionR[n] = targetFraction[n+NpartsL]/bisectionFraction[1];
-  //     }
-
-  //     SpectralPartition(graphR, NpartsR, targetFractionR, partitionR);
-
-  //     /*Inject partitioning*/
-  //     for (dlong n=0;n<graphR.Nverts;++n){
-  //       partition[mapR[n]] = partitionR[n] + NpartsL;
-  //     }
-
-  //     delete[] targetFractionR;
-  //     delete[] partitionR;
-  //   } else if (NpartsL>1) {
-  //     /*Inject partitioning*/
-  //     for (dlong n=0;n<graphR.Nverts;++n){
-  //       partition[mapR[n]] = 1 + NpartsL-1;
-  //     }
-
-  //   }
-  //   delete[] mapL;
-  //   delete[] mapR;
-  // }
+  /*Recursive call*/
+  SpectralPartition();
 }
 
 }

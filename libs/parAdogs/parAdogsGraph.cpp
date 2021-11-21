@@ -30,7 +30,8 @@ SOFTWARE.
 namespace paradogs {
 
 /*Build a graph from mesh connectivity info*/
-graph_t::graph_t(const dlong _Nelements,
+graph_t::graph_t(platform_t &_platform,
+                 const dlong _Nelements,
                  const int _dim,
                  const int _Nverts,
                  const int _Nfaces,
@@ -41,6 +42,7 @@ graph_t::graph_t(const dlong _Nelements,
                  const dfloat EY[],
                  const dfloat EZ[],
                  MPI_Comm _comm):
+  platform(_platform),
   Nverts(_Nelements),
   Nelements(_Nelements),
   dim(_dim),
@@ -176,18 +178,21 @@ void graph_t::Split(const int partition[]) {
   int *recvOffsets0 = new int[size];
   int *recvOffsets1 = new int[size];
 
+  hlong *newIds = new hlong[Nverts+Nhalo];
+
   for (int r=0;r<size;++r) {
     Nsend0[r]=0;
     Nsend1[r]=0;
   }
 
-  /*Determine send counts*/
+  /*Determine new ids and send counts*/
   dlong cnt0=0;
   dlong cnt1=0;
   for(dlong e=0;e<Nverts;++e){
     if (partition[e]==0) {
       // new global element index
       const hlong ep = starts0[rank]+cnt0++;
+      newIds[e] = ep;
 
       // 0, chunk+1, 2*(chunk+1) ..., remainder*(chunk+1), remainder*(chunk+1) + chunk
       int r;
@@ -200,6 +205,7 @@ void graph_t::Split(const int partition[]) {
     } else {
       // new global element index
       const hlong ep = starts1[rank]+cnt1++;
+      newIds[e] = ep;
 
       // 0, chunk+1, 2*(chunk+1) ..., remainder*(chunk+1), remainder*(chunk+1) + chunk
       int r;
@@ -214,6 +220,36 @@ void graph_t::Split(const int partition[]) {
 
   delete[] starts0;
   delete[] starts1;
+
+  if (L[0].A) {
+    /*If we have connected the elements, share the newIds*/
+    L[0].A->halo->Exchange(newIds, 1, ogs::Hlong);
+
+    /*Then update the connectivity*/
+    dlong cnt=0;
+    for(dlong e=0;e<Nverts;++e){
+      const int part = partition[e];
+      for (int f=0;f<Nfaces;++f) {
+        const hlong gE = elements[e].E[f];
+        if (gE!=-1) {
+          dlong eN;
+          if (gE>=VoffsetL && gE<VoffsetU) { /*local neighbor*/
+            eN = static_cast<dlong>(gE-VoffsetL);
+          } else { /*halo neighbor*/
+            eN = colIds[cnt++]; /*Get the local id in the halo (we make this when building the Laplacian)*/
+          }
+
+          const int partN = partition[eN];
+          if (partN==part) { /*If both elements are in the same partition*/
+            elements[e].E[f] = newIds[eN]; /*Re index*/
+          } else {
+            elements[e].E[f] = -1;/*else break connections across the partitions*/
+          }
+        }
+      }
+    }
+  }
+  delete[] newIds;
 
   // find send offsets
   sendOffsets0[0]=0;
@@ -437,6 +473,7 @@ graph_t::~graph_t() {
   if (comm!=MPI_COMM_NULL) MPI_Comm_free(&comm);
 
   if (elements) {delete[] elements; elements=nullptr;}
+  if (colIds) {delete[] colIds; colIds=nullptr;}
 }
 
 }

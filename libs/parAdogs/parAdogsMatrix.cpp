@@ -27,6 +27,14 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsMatrix.hpp"
 #include <random>
+#include <algorithm>
+
+#ifdef GLIBCXX_PARALLEL
+#include <parallel/algorithm>
+using __gnu_parallel::sort;
+#else
+using std::sort;
+#endif
 
 namespace paradogs {
 
@@ -54,17 +62,17 @@ void parCSR::SpMV(const dfloat alpha, dfloat *x,
       y[i] = alpha*result;
   }
 
-  // halo->Exchange(x, 1, ogs::Dfloat);
+  halo->Exchange(x, 1, ogs::Dfloat);
 
-  // // #pragma omp parallel for
-  // for(dlong i=0; i<offd.nzRows; i++){ //local
-  //   const dlong row = offd.rows[i];
-  //   dfloat result = 0.0;
-  //   for(dlong jj=offd.mRowStarts[i]; jj<offd.mRowStarts[i+1]; jj++)
-  //     result += offd.vals[jj]*x[offd.cols[jj]];
+  #pragma omp parallel for
+  for(dlong i=0; i<offd.nzRows; i++){ //local
+    const dlong row = offd.rows[i];
+    dfloat result = 0.0;
+    for(dlong jj=offd.mRowStarts[i]; jj<offd.mRowStarts[i+1]; jj++)
+      result += offd.vals[jj]*x[offd.cols[jj]];
 
-  //   y[row] += alpha*result;
-  // }
+    y[row] += alpha*result;
+  }
 }
 
 void parCSR::SpMV(const dfloat alpha, dfloat *x,
@@ -80,16 +88,17 @@ void parCSR::SpMV(const dfloat alpha, dfloat *x,
     z[i] = alpha*result + beta*y[i];
   }
 
-  // halo->Exchange(x, 1, ogs::Dfloat);
+  halo->Exchange(x, 1, ogs::Dfloat);
 
-  // for(dlong i=0; i<offd.nzRows; i++){ //local
-  //   const dlong row = offd.rows[i];
-  //   dfloat result = 0.0;
-  //   for(dlong jj=offd.mRowStarts[i]; jj<offd.mRowStarts[i+1]; jj++)
-  //     result += offd.vals[jj]*x[offd.cols[jj]];
+  #pragma omp parallel for
+  for(dlong i=0; i<offd.nzRows; i++){ //local
+    const dlong row = offd.rows[i];
+    dfloat result = 0.0;
+    for(dlong jj=offd.mRowStarts[i]; jj<offd.mRowStarts[i+1]; jj++)
+      result += offd.vals[jj]*x[offd.cols[jj]];
 
-  //   z[row] += alpha*result;
-  // }
+    z[row] += alpha*result;
+  }
 }
 
 //------------------------------------------------------------------------
@@ -101,105 +110,102 @@ void parCSR::SpMV(const dfloat alpha, dfloat *x,
 //build a parCSR matrix from a distributed COO matrix
 parCSR::parCSR(dlong _Nrows, dlong _Ncols,
                const dlong NNZ,
-               nonZero_t entries[])
-  // platform(A.platform),
-  // comm(A.comm)
-  {
+               nonZero_t entries[],
+               platform_t &_platform,
+               MPI_Comm _comm):
+  platform(_platform),
+  comm(_comm) {
 
-  // int rank;
-  // int size;
-  // MPI_Comm_rank(comm, &rank);
-  // MPI_Comm_size(comm, &size);
-
-  // //copy global partition
-  // globalRowStarts = (hlong *) calloc(size+1,sizeof(hlong));
-  // globalColStarts = (hlong *) calloc(size+1,sizeof(hlong));
-  // memcpy(globalRowStarts, A.globalRowStarts, (size+1)*sizeof(hlong));
-  // memcpy(globalColStarts, A.globalColStarts, (size+1)*sizeof(hlong));
-
-  // const hlong globalRowOffset = globalRowStarts[rank];
-  // const hlong globalColOffset = globalColStarts[rank];
-
-  // Nrows = (dlong)(globalRowStarts[rank+1]-globalRowStarts[rank]);
-  // Ncols = (dlong)(globalColStarts[rank+1]-globalColStarts[rank]);
+  int rank;
+  int size;
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &size);
 
   Nrows = _Nrows;
   Ncols = _Ncols;
 
+  /*Get global row/col offsets*/
+  hlong localNrows = static_cast<hlong>(Nrows);
+  hlong localNcols = static_cast<hlong>(Ncols);
+  MPI_Scan(&localNrows, &rowOffsetU, 1, MPI_HLONG, MPI_SUM, comm);
+  MPI_Scan(&localNcols, &colOffsetU, 1, MPI_HLONG, MPI_SUM, comm);
+  rowOffsetL = rowOffsetU-Nrows;
+  colOffsetL = colOffsetU-Ncols;
+
   diag.rowStarts = new dlong[Nrows+1];
-  // offd.rowStarts = (dlong *) calloc(Nrows+1, sizeof(dlong));
+  offd.rowStarts = new dlong[Nrows+1];
 
   #pragma omp parallel for
-  for (dlong n=0;n<Nrows+1;n++) diag.rowStarts[n]=0;
+  for (dlong n=0;n<Nrows+1;n++) {
+    diag.rowStarts[n]=0;
+    offd.rowStarts[n]=0;
+  }
 
   // //count the entries in each row
   for (dlong n=0;n<NNZ;n++) {
-    const dlong row = static_cast<dlong>(entries[n].row);
-    diag.rowStarts[row+1]++;
+    const dlong row = static_cast<dlong>(entries[n].row-rowOffsetL);
+    if (   (entries[n].col <  colOffsetL)
+        || (entries[n].col >= colOffsetU)) {
+      offd.rowStarts[row+1]++;
+    } else {
+      diag.rowStarts[row+1]++;
+    }
   }
 
-  // for (dlong n=0;n<A.nnz;n++) {
-  //   const dlong row = (dlong) (A.entries[n].row - globalRowOffset);
-  //   if (   (A.entries[n].col < globalColOffset)
-  //       || (A.entries[n].col > globalColOffset+Ncols-1))
-  //     offd.rowStarts[row+1]++;
-  //   else
-  //     diag.rowStarts[row+1]++;
-  // }
+  // count how many rows are shared
+  offd.nzRows=0;
+  for(dlong i=0; i<Nrows; i++)
+    if (offd.rowStarts[i+1]>0) offd.nzRows++;
 
-  // offd.nzRows=0;
+  offd.rows       = new dlong[offd.nzRows];
+  offd.mRowStarts = new dlong[offd.nzRows+1];
 
-  // // count how many rows are shared
-  // for(dlong i=0; i<Nrows; i++)
-  //   if (offd.rowStarts[i+1]>0) offd.nzRows++;
-
-  // offd.rows       = (dlong *) calloc(offd.nzRows, sizeof(dlong));
-  // offd.mRowStarts = (dlong *) calloc(offd.nzRows+1, sizeof(dlong));
-
-  // // cumulative sum
-  // dlong cnt=0;
+  // cumulative sum
+  dlong cnt=0;
+  offd.mRowStarts[0]=0;
   for(dlong i=0; i<Nrows; i++) {
-    // if (offd.rowStarts[i+1]>0) {
-    //   offd.rows[cnt] = i; //record row id
-    //   offd.mRowStarts[cnt+1] = offd.mRowStarts[cnt] + offd.rowStarts[i+1];
-    //   cnt++;
-    // }
+    if (offd.rowStarts[i+1]>0) {
+      offd.rows[cnt] = i; //record row id
+      offd.mRowStarts[cnt+1] = offd.mRowStarts[cnt] + offd.rowStarts[i+1];
+      cnt++;
+    }
     diag.rowStarts[i+1] += diag.rowStarts[i];
-    // offd.rowStarts[i+1] += offd.rowStarts[i];
+    offd.rowStarts[i+1] += offd.rowStarts[i];
   }
   diag.nnz = diag.rowStarts[Nrows];
-  // offd.nnz = offd.rowStarts[Nrows];
+  offd.nnz = offd.rowStarts[Nrows];
 
-  // // Halo setup
-  // cnt=0;
-  // hlong *colIds = (hlong *) malloc(offd.nnz*sizeof(hlong));
-  // for (dlong n=0;n<A.nnz;n++) {
-  //   if ( (A.entries[n].col < globalColOffset)
-  //     || (A.entries[n].col > globalColOffset+Ncols-1))
-  //     colIds[cnt++] = A.entries[n].col;
-  // }
-  // haloSetup(colIds); //setup halo, and transform colIds to a local indexing
+  // Halo setup
+  cnt=0;
+  hlong *colIds = new hlong[offd.nnz];
+  for (dlong n=0;n<NNZ;n++) {
+    if (   (entries[n].col <  colOffsetL)
+        || (entries[n].col >= colOffsetU)) {
+      colIds[cnt++] = entries[n].col;
+    }
+  }
+  haloSetup(colIds); //setup halo, and transform colIds to a local indexing
 
   // //fill the CSR matrices
   diag.cols = new dlong[diag.nnz];
-  // offd.cols = (dlong *)  calloc(offd.nnz, sizeof(dlong));
+  offd.cols = new dlong[offd.nnz];
   diag.vals = new dfloat[diag.nnz];
-  // offd.vals = (pfloat *) calloc(offd.nnz, sizeof(pfloat));
+  offd.vals = new dfloat[offd.nnz];
   dlong diagCnt = 0;
-  // dlong offdCnt = 0;
+  dlong offdCnt = 0;
   for (dlong n=0;n<NNZ;n++) {
-    // if ( (A.entries[n].col < globalColOffset)
-    //   || (A.entries[n].col > globalColOffset+NlocalCols-1)) {
-    //   offd.cols[offdCnt] = colIds[offdCnt];
-    //   offd.vals[offdCnt] = A.entries[n].val;
-    //   offdCnt++;
-    // } else {
-      diag.cols[diagCnt] = static_cast<dlong>(entries[n].col);
+    if (   (entries[n].col <  colOffsetL)
+        || (entries[n].col >= colOffsetU)) {
+      offd.cols[offdCnt] = colIds[offdCnt];
+      offd.vals[offdCnt] = entries[n].val;
+      offdCnt++;
+    } else {
+      diag.cols[diagCnt] = static_cast<dlong>(entries[n].col-colOffsetL);
       diag.vals[diagCnt] = entries[n].val;
       diagCnt++;
-    // }
+    }
   }
-  // free(colIds);
+  delete[] colIds;
 }
 
 //------------------------------------------------------------------------
@@ -218,80 +224,79 @@ typedef struct {
 } parallelId_t;
 
 
-void parCSR::haloSetup(hlong *colIds) {
+void parCSR::haloSetup(hlong colIds[]) {
 
-  // int rank;
-  // MPI_Comm_rank(comm, &rank);
+  int rank;
+  MPI_Comm_rank(comm, &rank);
 
-  // const hlong globalOffset = globalColStarts[rank];
+  //collect the unique nonlocal column ids
+  parallelId_t*  parIds = new parallelId_t[offd.nnz];
 
-  // //collect the unique nonlocal column ids
-  // parallelId_t*  parIds = (parallelId_t*) malloc(offd.nnz*sizeof(parallelId_t));
+  for (dlong n=0;n<offd.nnz;n++) {
+    parIds[n].localId  = n;
+    parIds[n].globalId = colIds[n];
+  }
 
-  // for (dlong n=0;n<offd.nnz;n++) {
-  //   parIds[n].localId  = n;
-  //   parIds[n].globalId = colIds[n];
-  // }
+  //sort by global index
+  sort(parIds, parIds+offd.nnz,
+       [](const parallelId_t& a, const parallelId_t& b) {
+         if(a.globalId < b.globalId) return true;
+         if(a.globalId > b.globalId) return false;
 
-  // //sort by global index
-  // std::sort(parIds, parIds+offd.nnz,
-  //           [](const parallelId_t& a, const parallelId_t& b) {
-  //             if(a.globalId < b.globalId) return true;
-  //             if(a.globalId > b.globalId) return false;
+         return (a.localId < b.localId);
+       });
 
-  //             return (a.localId < b.localId);
-  //           });
+  //count unique nonlocal column ids
+  dlong Noffdcols = 0; //number of unique columns
+  if(offd.nnz) parIds[0].newId = Noffdcols;
+  for (dlong n=1;n<offd.nnz;n++) {
+    if (parIds[n].globalId != parIds[n-1].globalId)
+      Noffdcols++;
 
-  // //count unique nonlocal column ids
-  // dlong Noffdcols = 0; //number of unique columns
-  // if(offd.nnz) parIds[0].newId = Noffdcols;
-  // for (dlong n=1;n<offd.nnz;n++) {
-  //   if (parIds[n].globalId != parIds[n-1].globalId)
-  //     Noffdcols++;
+    parIds[n].newId = Noffdcols;
+  }
+  if(offd.nnz) Noffdcols++;
 
-  //   parIds[n].newId = Noffdcols;
-  // }
-  // if(offd.nnz) Noffdcols++;
+  //record the global ids of the unique columns
+  hlong *offdcols = new hlong[Noffdcols];
+  Noffdcols = 0;
+  if(offd.nnz) offdcols[Noffdcols++] = parIds[0].globalId;
+  for (dlong n=1;n<offd.nnz;n++)
+    if (parIds[n].globalId != parIds[n-1].globalId)
+      offdcols[Noffdcols++] = parIds[n].globalId;
 
-  // //record the global ids of the unique columns
-  // hlong *offdcols = (hlong *) malloc(Noffdcols*sizeof(hlong));
-  // Noffdcols = 0;
-  // if(offd.nnz) offdcols[Noffdcols++] = parIds[0].globalId;
-  // for (dlong n=1;n<offd.nnz;n++)
-  //   if (parIds[n].globalId != parIds[n-1].globalId)
-  //     offdcols[Noffdcols++] = parIds[n].globalId;
+  //sort back to local order
+  sort(parIds, parIds+offd.nnz,
+       [](const parallelId_t& a, const parallelId_t& b) {
+         if(a.localId < b.localId) return true;
+         if(a.localId > b.localId) return false;
 
-  // //sort back to local order
-  // std::sort(parIds, parIds+offd.nnz,
-  //           [](const parallelId_t& a, const parallelId_t& b) {
-  //             if(a.localId < b.localId) return true;
-  //             if(a.localId > b.localId) return false;
+         return (a.globalId < b.globalId);
+       });
 
-  //             return (a.globalId < b.globalId);
-  //           });
+  // be careful to make sure Ncols is set at this point
+  NlocalCols = Ncols;
+  Ncols += Noffdcols;
 
-  // // be careful to make sure Ncols is set at this point
-  // NlocalCols = Ncols;
-  // Ncols += Noffdcols;
+  //make an array of all the column ids required on this rank (local first)
+  colMap = new hlong[Ncols];
+  for (dlong n=0; n<NlocalCols; n++)      colMap[n] = n+colOffsetL+1; //local rows
+  for (dlong n=NlocalCols; n<Ncols; n++)  colMap[n] = -(offdcols[n-NlocalCols]+1);    //nonlocal rows
 
-  // //make an array of all the column ids required on this rank (local first)
-  // colMap = (hlong*) malloc(Ncols*sizeof(hlong));
-  // for (dlong n=0; n<NlocalCols; n++)      colMap[n] = n+globalOffset+1; //local rows
-  // for (dlong n=NlocalCols; n<Ncols; n++)  colMap[n] = -(offdcols[n-NlocalCols]+1);    //nonlocal rows
+  //make a halo exchange to share column entries and an ogs for gsops accross columns
+  bool verbose = false;
+  halo = new ogs::halo_t(platform);
+  halo->Setup(Ncols, colMap, comm, ogs::Pairwise, verbose);
 
-  // //make a halo exchange to share column entries and an ogs for gsops accross columns
-  // bool verbose = false;
-  // halo = new ogs::halo_t(platform);
-  // halo->Setup(Ncols, colMap, comm, ogs::Auto, verbose);
+  //shift back to 0-indexed
+  for (dlong n=0; n<Ncols; n++) colMap[n]=abs(colMap[n])-1;
 
-  // //shift back to 0-indexed
-  // for (dlong n=0; n<Ncols; n++) colMap[n]=abs(colMap[n])-1;
+  //update column numbering
+  for (dlong n=0;n<offd.nnz;n++)
+    colIds[n] = NlocalCols + parIds[n].newId;
 
-  // //update column numbering
-  // for (dlong n=0;n<offd.nnz;n++)
-  //   colIds[n] = NlocalCols + parIds[n].newId;
-
-  // free(parIds);
+  delete[] offdcols;
+  delete[] parIds;
 }
 
 void parCSR::Free() {
@@ -314,46 +319,11 @@ void parCSR::Free() {
   if (diagA)   {delete[] diagA; diagA=nullptr;}
   if (diagInv) {delete[] diagInv; diagInv=nullptr;}
 
-  if (globalRowStarts) {delete[] globalRowStarts; globalRowStarts=nullptr;}
-  if (globalColStarts) {delete[] globalColStarts; globalColStarts=nullptr;}
+  NlocalCols=0;
+  if (halo)   {delete halo; halo = nullptr;}
   if (colMap) {delete[] colMap; colMap=nullptr;}
 
-  if (halo)   {halo->Free(); halo = nullptr;}
-  NlocalCols=0;
-
   rho=0.0;
-}
-
-// Assignment operator, copy & swap idiom
-parCSR& parCSR::operator=(parCSR A) {
-  std::swap(Nrows,A.Nrows);
-  std::swap(Ncols,A.Ncols);
-
-  std::swap(diag.nnz, A.diag.nnz);
-  std::swap(diag.rowStarts, A.diag.rowStarts);
-  std::swap(diag.cols, A.diag.cols);
-  std::swap(diag.vals, A.diag.vals);
-
-  std::swap(offd.nnz, A.offd.nnz);
-  std::swap(offd.nzRows, A.offd.nzRows);
-  std::swap(offd.rowStarts, A.offd.rowStarts);
-  std::swap(offd.mRowStarts, A.offd.mRowStarts);
-  std::swap(offd.rows, A.offd.rows);
-  std::swap(offd.cols, A.offd.cols);
-  std::swap(offd.vals, A.offd.vals);
-
-  std::swap(diagA, A.diagA);
-  std::swap(diagInv, A.diagInv);
-
-  std::swap(globalRowStarts, A.globalRowStarts);
-  std::swap(globalColStarts, A.globalColStarts);
-  std::swap(colMap, A.colMap);
-
-  std::swap(halo, A.halo);
-  std::swap(NlocalCols, A.NlocalCols);
-
-  std::swap(rho, A.rho);
-  return *this;
 }
 
 //------------------------------------------------------------------------
@@ -364,13 +334,10 @@ parCSR& parCSR::operator=(parCSR A) {
 
 dfloat parCSR::rhoDinvA(dfloat null[]){
 
-  // int size;
-  // MPI_Comm_size(comm, &size);
-
   int k = 10;
 
-  // hlong Ntotal = globalRowStarts[size];
-  hlong Ntotal = Nrows;
+  hlong Ntotal = static_cast<hlong>(Nrows);
+  MPI_Allreduce(MPI_IN_PLACE, &Ntotal, 1, MPI_HLONG, MPI_SUM, comm);
   if(k > Ntotal) k = (int) Ntotal;
 
   // do an arnoldi
@@ -392,16 +359,16 @@ dfloat parCSR::rhoDinvA(dfloat null[]){
   /*Project out null vector*/
   dfloat nulldot =0.0;
   for(dlong n=0; n<Nrows; n++) nulldot += null[n]*Vx[n];
+  MPI_Allreduce(MPI_IN_PLACE, &nulldot, 1, MPI_DFLOAT, MPI_SUM, comm);
 
   #pragma omp parallel for
   for(dlong n=0; n<Nrows; n++) Vx[n] -= nulldot*null[n];
 
   // dfloat norm_vo = vectorNorm(Nrows,Vx, comm);
-  dfloat norm_vo=0.0, gnorm_vo=0.0;
+  dfloat norm_vo=0.0;
   for(dlong n=0; n<Nrows; n++) norm_vo += Vx[n]*Vx[n];
-  // MPI_Allreduce(&norm_vo, &gnorm_vo, 1, MPI_DFLOAT, MPI_SUM, comm);
-  gnorm_vo = norm_vo;
-  norm_vo = sqrt(gnorm_vo);
+  MPI_Allreduce(MPI_IN_PLACE, &norm_vo, 1, MPI_DFLOAT, MPI_SUM, comm);
+  norm_vo = sqrt(norm_vo);
 
   // vectorScale(Nrows, 1.0/norm_vo, Vx);
   #pragma omp parallel for
@@ -431,10 +398,9 @@ dfloat parCSR::rhoDinvA(dfloat null[]){
       dfloat *Vi = V+i*Nrows;
       // H(i,j) = v[i]'*A*v[j]
       // dfloat hij = vectorInnerProd(Nrows, V[i], V[j+1],comm);
-      dfloat local_hij=0.0, hij=0.0;
-      for(dlong n=0; n<Nrows; n++) local_hij += Vi[n]*Vjp1[n];
-      // MPI_Allreduce(&local_hij, &hij, 1, MPI_DFLOAT, MPI_SUM, comm);
-      hij = local_hij;
+      dfloat hij=0.0;
+      for(dlong n=0; n<Nrows; n++) hij += Vi[n]*Vjp1[n];
+      MPI_Allreduce(MPI_IN_PLACE, &hij, 1, MPI_DFLOAT, MPI_SUM, comm);
 
       // v[j+1] = v[j+1] - hij*v[i]
       // vectorAdd(Nrows,-hij, V[i], 1.0, V[j+1]);
@@ -447,11 +413,10 @@ dfloat parCSR::rhoDinvA(dfloat null[]){
     if(j+1 < k){
 
       // dfloat norm_vj = vectorNorm(Nrows,V[j+1],comm);
-      dfloat norm_vj=0.0, gnorm_vj=0.0;
+      dfloat norm_vj=0.0;
       for(dlong n=0; n<Nrows; n++) norm_vj += Vjp1[n]*Vjp1[n];
-      // MPI_Allreduce(&norm_vj, &gnorm_vj, 1, MPI_DFLOAT, MPI_SUM, comm);
-      gnorm_vj = norm_vj;
-      norm_vj = sqrt(gnorm_vj);
+      MPI_Allreduce(MPI_IN_PLACE, &norm_vj, 1, MPI_DFLOAT, MPI_SUM, comm);
+      norm_vj = sqrt(norm_vj);
 
       H[j+1+ j*k] = (double) norm_vj;
 

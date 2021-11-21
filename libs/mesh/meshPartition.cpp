@@ -29,26 +29,28 @@ SOFTWARE.
 
 void mesh_t::Partition(){
 
-	paradogs::MeshInertialPartition(Nelements,
-																	dim,
-					                        Nverts,
-					                        Nfaces,
-					                        NfaceVertices,
-					                        faceVertices,
-					                        EToV,
-					                        EToE,
-					                        EToF,
-					                        EX,
-					                        EY,
-					                        EZ,
-					                        comm);
+  paradogs::MeshPartition(platform,
+                          settings,
+                          Nelements,
+                          dim,
+                          Nverts,
+                          Nfaces,
+                          NfaceVertices,
+                          faceVertices,
+                          EToV,
+                          EToE,
+                          EToF,
+                          EX,
+                          EY,
+                          EZ,
+                          comm);
 
-	/*Plot the resulting partition*/
-	dfloat *q = new dfloat[Nelements*Nverts];
+  /*Plot the resulting partition*/
+  dfloat *q = new dfloat[Nelements*Nverts];
 
   for (dlong e=0;e<Nelements;e++)
-	  for (dlong n=0;n<Nverts;n++)
-	    q[n+e*Nverts] = rank;
+    for (dlong n=0;n<Nverts;n++)
+      q[n+e*Nverts] = rank;
 
   Plot(q);
 

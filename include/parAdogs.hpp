@@ -33,33 +33,24 @@ SOFTWARE.
 
 namespace paradogs {
 
-  void MeshInertialPartition(dlong &Nelements,
-                             const  int dim,
-                             const  int Nverts,
-                             const  int Nfaces,
-                             const  int NfaceVertices,
-                             const  int* faceVertices,
-                             hlong*  &EToV,
-                             hlong*  &EToE,
-                             int*    &EToF,
-                             dfloat* &EX,
-                             dfloat* &EY,
-                             dfloat* &EZ,
-                             MPI_Comm comm);
+  void AddSettings(settings_t& settings);
+  void ReportSettings(settings_t& settings);
 
-  void MeshSpectralPartition(dlong &Nelements,
-                             const  int dim,
-                             const  int Nverts,
-                             const  int Nfaces,
-                             const  int NfaceVertices,
-                             const  int* faceVertices,
-                             hlong*  &EToV,
-                             hlong*  &EToE,
-                             int*    &EToF,
-                             dfloat* &EX,
-                             dfloat* &EY,
-                             dfloat* &EZ,
-                             MPI_Comm comm);
+  void MeshPartition(platform_t &platform,
+                     settings_t &settings,
+                     dlong &Nelements,
+                     const  int dim,
+                     const  int Nverts,
+                     const  int Nfaces,
+                     const  int NfaceVertices,
+                     const  int* faceVertices,
+                     hlong*  &EToV,
+                     hlong*  &EToE,
+                     int*    &EToF,
+                     dfloat* &EX,
+                     dfloat* &EY,
+                     dfloat* &EZ,
+                     MPI_Comm comm);
 }
 
 #endif

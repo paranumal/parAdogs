@@ -40,11 +40,13 @@ namespace paradogs {
 
 class graph_t {
 private:
+  platform_t &platform;
+
   MPI_Comm gcomm=MPI_COMM_NULL;
   MPI_Comm comm=MPI_COMM_NULL;
 
   int rank, size;
-  dlong Nverts=0;
+  dlong Nverts=0, Nhalo=0;
   hlong NVertsGlobal=0;
   hlong VoffsetL=0, VoffsetU=0;
 
@@ -75,9 +77,12 @@ private:
   mgLevel_t L[PARADOGS_MAX_LEVELS];
   coarseSolver_t coarseSolver;
 
+  hlong* colIds=nullptr;
+
 public:
   /*Build a graph from mesh connectivity info*/
-  graph_t(const dlong _Nelements,
+  graph_t(platform_t &_platform,
+          const dlong _Nelements,
           const int _dim,
           const int _Nverts,
           const int _Nfaces,

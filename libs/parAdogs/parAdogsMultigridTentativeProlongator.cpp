@@ -29,53 +29,67 @@ SOFTWARE.
 
 namespace paradogs {
 
-parCSR TentativeProlongator(const dlong Nf,
-                            const dlong Nc,
-                            dlong FineToCoarse[],
-                            dfloat FineNull[],
-                            dfloat CoarseNull[]) {
+parCSR* TentativeProlongator(const dlong Nf,
+                             const dlong Nc,
+                             platform_t& platform,
+                             MPI_Comm comm,
+                             hlong FineToCoarse[],
+                             dfloat FineNull[],
+                             dfloat **CoarseNull) {
   dlong nnz = Nf;
   nonZero_t *entries = new nonZero_t[nnz];
+
+  hlong localNf=static_cast<hlong>(Nf);
+  hlong NfOffsetL=0, NfOffsetU=0;
+  MPI_Scan(&localNf, &NfOffsetU, 1, MPI_HLONG, MPI_SUM, comm);
+  NfOffsetL = NfOffsetU-Nf;
 
   /* Each entry is the CoarseNull vector entry*/
   #pragma omp parallel for
   for (dlong n=0;n<Nf;++n) {
-    entries[n].row = n;
+    entries[n].row = n + NfOffsetL;
     entries[n].col = FineToCoarse[n];
     entries[n].val = FineNull[n];
   }
 
-  parCSR T(Nf, Nc, nnz, entries);
+  parCSR* T = new parCSR(Nf, Nc,
+                         nnz, entries,
+                         platform, comm);
   delete[] entries;
+
+  /*Create coarse nullvector*/
+  *CoarseNull = new dfloat[T->Ncols];
 
   /*Init coarse null*/
   #pragma omp parallel for
-  for (dlong v=0;v<Nc;++v) CoarseNull[v] = 0.0;
+  for (dlong v=0;v<T->Ncols;++v) (*CoarseNull)[v] = 0.0;
 
   /*Sum columns of T*/
   //add local nonzeros
-  for (dlong n=0;n<T.diag.nnz;++n)
-    CoarseNull[T.diag.cols[n]] += T.diag.vals[n] * T.diag.vals[n];
+  for (dlong n=0;n<T->diag.nnz;++n)
+    (*CoarseNull)[T->diag.cols[n]] += T->diag.vals[n] * T->diag.vals[n];
 
   //add nonlocal nonzeros
-  // for(dlong i=0; i<P->offd.nnz; i++)
-  //   CoarseNull[P->offd.cols[i]] += P->offd.vals[i] * P->offd.vals[i];
+  for(dlong n=0; n<T->offd.nnz;++n)
+    (*CoarseNull)[T->offd.cols[n]] += T->offd.vals[n] * T->offd.vals[n];
 
   //add the halo values to their origins
-  // P->halo->Combine(CoarseNull, 1, ogs::Dfloat);
+  T->halo->Combine(*CoarseNull, 1, ogs::Dfloat);
 
   #pragma omp parallel for
   for (dlong n=0;n<Nc;++n)
-    CoarseNull[n] = sqrt(CoarseNull[n]);
+    (*CoarseNull)[n] = sqrt((*CoarseNull)[n]);
 
   //share the results
-  // P->halo->Exchange(CoarseNull, 1, ogs::Dfloat);
+  T->halo->Exchange(*CoarseNull, 1, ogs::Dfloat);
 
   #pragma omp parallel for
-  for (dlong n=0;n<T.diag.nnz;++n)
-    T.diag.vals[n] /= CoarseNull[T.diag.cols[n]];
-  // for(dlong v=0; v<Nf; v++)
-  //   P[v] /= cgraph.CoarseNull[FtoC[v]];
+  for (dlong n=0;n<T->diag.nnz;++n)
+    T->diag.vals[n] /= (*CoarseNull)[T->diag.cols[n]];
+
+  #pragma omp parallel for
+  for (dlong n=0;n<T->offd.nnz;++n)
+    T->offd.vals[n] /= (*CoarseNull)[T->offd.cols[n]];
 
   return T;
 }

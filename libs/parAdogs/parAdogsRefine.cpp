@@ -35,9 +35,10 @@ namespace paradogs {
 /****************************************/
 void graph_t::Refine(const int level) {
 
-  parCSR &A = L[level].A;
+  parCSR* A = L[level].A;
   dfloat *null = L[level].null;
-  const dlong N = A.Nrows;
+  const dlong N = L[level].Nrows;
+  const dlong Ncols = L[level].Ncols;
 
   dfloat *Fiedler = L[level].Fiedler;
 
@@ -50,12 +51,12 @@ void graph_t::Refine(const int level) {
 
   const int maxIters=1;
 
-  dfloat *x  = new dfloat[N];
-  dfloat *scratch  = new dfloat[3*N];
+  dfloat *x  = new dfloat[Ncols];
+  dfloat *scratch  = new dfloat[3*Ncols];
   dfloat *AF = scratch;
 
   /*AF = A*F*/
-  A.SpMV(1.0, Fiedler, 0.0, AF);
+  A->SpMV(1.0, Fiedler, 0.0, AF);
 
   /*theta = F^T * A * F */
   dfloat theta = 0.0;
@@ -64,10 +65,12 @@ void graph_t::Refine(const int level) {
     theta += Fiedler[n]*AF[n];
     normAF += AF[n]*AF[n];
   }
+  MPI_Allreduce(MPI_IN_PLACE, &theta, 1, MPI_DFLOAT, MPI_SUM, comm);
+  MPI_Allreduce(MPI_IN_PLACE, &normAF, 1, MPI_DFLOAT, MPI_SUM, comm);
 
   dfloat err = sqrt(std::abs(normAF - theta*theta))/theta;
 
-  printf("Intial err = %f, theta = %f, ||AF|| = %f \n", err, theta, sqrt(normAF));
+  // if (rank==0) printf("Intial err = %f, theta = %f, ||AF|| = %f \n", err, theta, sqrt(normAF));
 
   for (int it=0;it<maxIters;++it) {
 
@@ -84,13 +87,15 @@ void graph_t::Refine(const int level) {
     }
 
     /*Solve A_{l}*x = Fiedler*/
-    const int cg_iter = Solve(level, CG_TOL, Fiedler, x, scratch);
+    (void) Solve(level, CG_TOL, Fiedler, x, scratch);
+    // const int cg_iter = Solve(level, CG_TOL, Fiedler, x, scratch);
 
     /*Project out null vector*/
     dfloat dot=0.0;
     for (int n=0;n<N;++n) {
       dot += x[n]*null[n];
     }
+    MPI_Allreduce(MPI_IN_PLACE, &dot, 1, MPI_DFLOAT, MPI_SUM, comm);
 
     #pragma omp parallel for
     for (int n=0;n<N;++n) {
@@ -101,6 +106,7 @@ void graph_t::Refine(const int level) {
     for (dlong n=0;n<N;++n) {
       normx += x[n]*x[n];
     }
+    MPI_Allreduce(MPI_IN_PLACE, &normx, 1, MPI_DFLOAT, MPI_SUM, comm);
     normx = sqrt(normx);
 
     /*F = x /||x||*/
@@ -110,7 +116,7 @@ void graph_t::Refine(const int level) {
     }
 
     /*AF = A*F*/
-    A.SpMV(1.0, Fiedler, 0.0, AF);
+    A->SpMV(1.0, Fiedler, 0.0, AF);
 
     /*theta = F^T * A * F */
     theta = 0.0;
@@ -119,14 +125,16 @@ void graph_t::Refine(const int level) {
       theta += Fiedler[n]*AF[n];
       normAF += AF[n]*AF[n];
     }
+    MPI_Allreduce(MPI_IN_PLACE, &theta, 1, MPI_DFLOAT, MPI_SUM, comm);
+    MPI_Allreduce(MPI_IN_PLACE, &normAF, 1, MPI_DFLOAT, MPI_SUM, comm);
 
     err = sqrt(std::abs(normAF - theta*theta))/theta;
 
-    printf("err = %f, theta = %f, ||AF|| = %f, cg_iter=%d\n", err, theta, sqrt(normAF), cg_iter);
+    // if (rank==0)  printf("err = %f, theta = %f, ||AF|| = %f, cg_iter=%d\n", err, theta, sqrt(normAF), cg_iter);
   }
 
-  delete[] x;
   delete[] scratch;
+  delete[] x;
 }
 
 }
