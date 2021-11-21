@@ -226,6 +226,7 @@ void parCSR::Aggregate(dlong& Nc,
 
   } while(true);
 
+  delete[] rand;
   delete[] Tr;
   delete[] Tn;
 
@@ -291,8 +292,8 @@ void parCSR::Aggregate(dlong& Nc,
         const int   sk = Ts[k];
         const hlong nk = colMap[k];
         if (sk!=-1) { /*If the neighbor is in the neighborhood of an MIS node*/
-          const float rk = rand[k];
-          // const float rk = strong.diag.vals[j];
+          // const float rk = rand[k];
+          const float rk = strong.diag.vals[j];
           if( (rk>rmax)            || /*If edge is strongest*/
              ((rk==rmax)&&(nk>kmax))) { /*Rare, but just in case, break tie with index number*/
             cmax = FineToCoarse[k];
@@ -310,7 +311,6 @@ void parCSR::Aggregate(dlong& Nc,
 
   delete[] Ts;
   delete[] state;
-  delete[] rand;
 }
 
 }
