@@ -38,27 +38,39 @@ Optional:
 
 ---
 ### 3. Building
-```git clone --recursive https://github.com/noelchalmers/paradogs```
-```cd paradogs```
-```make -j `nproc` ```
+```
+git clone --recursive https://github.com/noelchalmers/paradogs
+cd paradogs
+make -j `nproc` 
+```
 
 ---
 ### 4. Running Simple Tests
 A helper run script for running and immediately viewing the resulting mesh partitioning is provided as
-```runParAdogs.sh <np> <setup.rc>```
+```
+runParAdogs.sh <np> <setup.rc>
+```
 
 For example, a test which partitions a simple box mesh of Hexahedral elements into 16 paritions can be run as
-```runParAdogs.sh 16 setups/setupHex3D.rc```
+```
+runParAdogs.sh 16 setups/setupHex3D.rc
+```
 
 To run directly with MPI, the syntax is
-```mpirun --np <<np> paradogsMain <setup.rc>```
+```
+mpirun --np <<np> paradogsMain <setup.rc>
+```
 
 ---
 ### 5. Stress tests
 Some larger tests are provided in the `tests/` directory. The `.msh` files must first be generated with Gmsh,
-```gmsh tests/FenceTet3D.geo -3 -format msh22 -o tests/FenceTet3D.msh```
+```
+gmsh tests/FenceTet3D.geo -3 -format msh22 -o tests/FenceTet3D.msh
+```
 and the tests can be run as usual,
-```runParAdogs.sh <np> tests/FenceTet3D.rc```
+```
+runParAdogs.sh <np> tests/FenceTet3D.rc
+```
 
 ---
 
