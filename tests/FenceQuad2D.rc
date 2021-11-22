@@ -1,0 +1,23 @@
+[FORMAT]
+2.0
+
+[THREAD MODEL]
+Serial
+
+[PLATFORM NUMBER]
+0
+
+[DEVICE NUMBER]
+0
+
+[MESH FILE]
+tests/FenceQuad2D.msh
+
+[MESH DIMENSION]
+2
+
+[ELEMENT TYPE] # number of edges
+4
+
+[PARADOGS PARTITIONING]
+SPECTRAL
