@@ -58,7 +58,7 @@ runParAdogs.sh 16 setups/setupHex3D.rc
 
 To run directly with MPI, the syntax is
 ```
-mpirun --np <<np> paradogsMain <setup.rc>
+mpirun --np <np> paradogsMain <setup.rc>
 ```
 
 ---
