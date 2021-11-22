@@ -1,5 +1,5 @@
 ## ParADoGs
-ParADoGs (**Par**allel **A**ccelerated **D**istribution of **G**raph**s**) is an experiemental distributed and fine-grain parallel mesh partitioner. It is designed for, and uses libraries from, [libParanumal](https://github.com/paranumal/libparanumal/), a finte element testbed funded in part by the US Department of Energy as part of the activities of the [Center for Efficient Exscale Discretizations](http://ceed.exascaleproject.org).
+ParADoGs (**Par**allel **A**ccelerated **D**istribution of **G**raph**s**) is an experiemental distributed and fine-grain parallel mesh partitioner. It is designed for, and uses libraries from, [libParanumal](https://github.com/paranumal/libparanumal/), a finite element testbed funded in part by the US Department of Energy as part of the activities of the [Center for Efficient Exscale Discretizations](http://ceed.exascaleproject.org).
 
 ---
 ### 1. Overview
@@ -9,9 +9,9 @@ ParADoGs implements some classic graph partitioining heuristics, favoring algori
 A. Supported elements:
   - Triangles, quadrilaterals, tetrahedra, hexahedra.
 
-B. Paritioners:
+B. Parititoners:
   - Resursive Inhertial Partitioning.
-  - Resursive Spectral Partitioning.
+  - Resursive Multilevel Spectral Partitioning.
 
 C. Local Ordering:
   - Cuthill-Mckee.
@@ -34,7 +34,7 @@ C. Local Ordering:
 
 Optional:
 - Paraview
-- Gmesh
+- Gmsh
 
 ---
 ### 3. Building
