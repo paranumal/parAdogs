@@ -29,6 +29,7 @@ SOFTWARE.
 #include "parAdogs/parAdogsPartition.hpp"
 #include <queue>
 
+namespace libp {
 
 namespace paradogs {
 
@@ -150,5 +151,7 @@ void graph_t::CuthillMckee() {
   delete[] newId;
 }
 
-}
+} //namespace paradogs
+
+} //namespace libp
 

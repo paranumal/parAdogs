@@ -28,6 +28,8 @@ SOFTWARE.
 #include "parAdogs/parAdogsGraph.hpp"
 #include <random>
 
+namespace libp {
+
 namespace paradogs {
 
 extern std::mt19937 RNG;
@@ -39,13 +41,13 @@ void MeshPartition(platform_t &platform,
                    const  int Nverts,
                    const  int Nfaces,
                    const  int NfaceVertices,
-                   const  int* faceVertices,
-                   hlong*  &EToV,
-                   hlong*  &EToE,
-                   int*    &EToF,
-                   dfloat* &EX,
-                   dfloat* &EY,
-                   dfloat* &EZ,
+                   const  libp::memory<int>& faceVertices,
+                   libp::memory<hlong>& EToV,
+                   libp::memory<hlong>& EToE,
+                   libp::memory<int>& EToF,
+                   libp::memory<dfloat>& EX,
+                   libp::memory<dfloat>& EY,
+                   libp::memory<dfloat>& EZ,
                    MPI_Comm comm) {
 
   /* Create RNG*/
@@ -111,5 +113,6 @@ void MeshPartition(platform_t &platform,
                     EZ);
 }
 
-}
+} //namespace paradogs
 
+} //namespace libp

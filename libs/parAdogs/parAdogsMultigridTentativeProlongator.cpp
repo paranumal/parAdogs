@@ -27,6 +27,8 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsGraph.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 parCSR* TentativeProlongator(const dlong Nf,
@@ -74,14 +76,14 @@ parCSR* TentativeProlongator(const dlong Nf,
     (*CoarseNull)[T->offd.cols[n]] += T->offd.vals[n] * T->offd.vals[n];
 
   //add the halo values to their origins
-  T->halo->Combine(*CoarseNull, 1, ogs::Dfloat);
+  T->halo.Combine(*CoarseNull, 1, ogs::Dfloat);
 
   #pragma omp parallel for
   for (dlong n=0;n<Nc;++n)
     (*CoarseNull)[n] = sqrt((*CoarseNull)[n]);
 
   //share the results
-  T->halo->Exchange(*CoarseNull, 1, ogs::Dfloat);
+  T->halo.Exchange(*CoarseNull, 1, ogs::Dfloat);
 
   #pragma omp parallel for
   for (dlong n=0;n<T->diag.nnz;++n)
@@ -94,6 +96,6 @@ parCSR* TentativeProlongator(const dlong Nf,
   return T;
 }
 
-}
+} //namespace paradogs
 
-
+} //namespace libp

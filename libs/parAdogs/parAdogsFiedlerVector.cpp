@@ -32,7 +32,7 @@ extern "C" {
   void dsyev_ (char *JOBZ, char *UPLO, int *N, double *A, int *LDA, double *W, double *WORK, int *LWORK, int *INFO);
 }
 
-dfloat* gFiedler;
+namespace libp {
 
 namespace paradogs {
 
@@ -188,5 +188,6 @@ void mgLevel_t::FiedlerVector() {
   delete[] M;
 }
 
-}
+} //namespace paradogs
 
+} //namespace libp

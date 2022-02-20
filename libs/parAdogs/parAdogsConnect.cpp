@@ -27,10 +27,12 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsGraph.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 typedef struct {
-  hlong v[MAX_NFACEVERTS]; // vertices on face
+  hlong v[graph_t::MAX_NFACEVERTS]; // vertices on face
   hlong element, elementN;
   int face, faceN;    // face info
   int rank;
@@ -273,4 +275,6 @@ void graph_t::Connect(){
   delete[] recvOffsets;
 }
 
-}
+} //namespace paradogs
+
+} //namespace libp

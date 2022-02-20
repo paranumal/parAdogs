@@ -28,6 +28,8 @@ SOFTWARE.
 #include "parAdogs/parAdogsGraph.hpp"
 #include "parAdogs/parAdogsMultigrid.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 /*Create graph Laplacian from mesh data*/
@@ -144,7 +146,7 @@ void graph_t::CreateLaplacian() {
   }
 
   //fill the halo region
-  A.halo->Exchange(A.diagA, 1, ogs::Dfloat);
+  A.halo.Exchange(A.diagA, 1, ogs::Dfloat);
 
   L[0].Nrows = A.Nrows;
   L[0].Ncols = A.Ncols;
@@ -159,4 +161,6 @@ void graph_t::CreateLaplacian() {
   }
 }
 
-}
+} //namespace paradogs
+
+} //namespace libp

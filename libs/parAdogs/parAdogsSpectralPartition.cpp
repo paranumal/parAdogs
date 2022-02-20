@@ -28,6 +28,8 @@ SOFTWARE.
 #include "parAdogs/parAdogsGraph.hpp"
 #include "parAdogs/parAdogsPartition.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 /*************************************************/
@@ -53,5 +55,7 @@ void graph_t::SpectralPartition() {
   SpectralPartition();
 }
 
-}
+} //namespace paradogs
+
+} //namespace libp
 

@@ -28,6 +28,8 @@ SOFTWARE.
 #include "parAdogs/parAdogsGraph.hpp"
 #include "parAdogs/parAdogsPartition.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 /*************************************************/
@@ -53,5 +55,6 @@ void graph_t::InertialPartition() {
   InertialPartition();
 }
 
-}
+} //namespace paradogs
 
+} //namespace libp

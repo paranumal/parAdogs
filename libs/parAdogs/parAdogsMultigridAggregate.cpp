@@ -29,6 +29,8 @@ SOFTWARE.
 #include "parAdogs/parAdogsPartition.hpp"
 #include <random>
 
+namespace libp {
+
 namespace paradogs {
 
 extern std::mt19937 RNG;
@@ -147,7 +149,7 @@ void parCSR::Aggregate(dlong& Nc,
   }
 
   //fill halo region
-  halo->Exchange(rand, 1, ogs::Float);
+  halo.Exchange(rand, 1, ogs::Float);
 
   do {
     // first neighbours
@@ -179,9 +181,9 @@ void parCSR::Aggregate(dlong& Nc,
     }
 
     //share results
-    halo->Exchange(Ts, 1, ogs::Int32);
-    halo->Exchange(Tr, 1, ogs::Float);
-    halo->Exchange(Tn, 1, ogs::Hlong);
+    halo.Exchange(Ts, 1, ogs::Int32);
+    halo.Exchange(Tr, 1, ogs::Float);
+    halo.Exchange(Tn, 1, ogs::Hlong);
 
     // second neighbours
     #pragma omp parallel for
@@ -215,7 +217,7 @@ void parCSR::Aggregate(dlong& Nc,
     }
 
     //share results
-    halo->Exchange(state, 1, ogs::Int32);
+    halo.Exchange(state, 1, ogs::Int32);
 
     // if number of undecided nodes = 0, algorithm terminates
     hlong cnt = 0;
@@ -255,8 +257,8 @@ void parCSR::Aggregate(dlong& Nc,
   }
 
   //share the initial aggregate flags
-  halo->Exchange(Ts, 1, ogs::Int32);
-  halo->Exchange(FineToCoarse, 1, ogs::Hlong);
+  halo.Exchange(Ts, 1, ogs::Int32);
+  halo.Exchange(FineToCoarse, 1, ogs::Hlong);
 
   // first neighbours
   #pragma omp parallel for
@@ -276,8 +278,8 @@ void parCSR::Aggregate(dlong& Nc,
     }
   }
 
-  halo->Exchange(Ts, 1, ogs::Int32);
-  halo->Exchange(FineToCoarse, 1, ogs::Hlong);
+  halo.Exchange(Ts, 1, ogs::Int32);
+  halo.Exchange(FineToCoarse, 1, ogs::Hlong);
 
   // second neighbours
   #pragma omp parallel for
@@ -307,10 +309,12 @@ void parCSR::Aggregate(dlong& Nc,
   }
 
   //share results
-  halo->Exchange(FineToCoarse, 1, ogs::Hlong);
+  halo.Exchange(FineToCoarse, 1, ogs::Hlong);
 
   delete[] Ts;
   delete[] state;
 }
 
-}
+} //namespace paradogs
+
+} //namespace libp

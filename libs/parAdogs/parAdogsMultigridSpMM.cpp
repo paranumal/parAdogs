@@ -28,6 +28,8 @@ SOFTWARE.
 #include "parAdogs/parAdogsMatrix.hpp"
 #include "parAdogs/parAdogsPartition.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 parCSR* SpMM(const parCSR* A, const parCSR* B){
@@ -327,4 +329,6 @@ parCSR* SpMM(const parCSR* A, const parCSR* B){
   return C;
 }
 
-}
+} //namespace paradogs
+
+} //namespace libp

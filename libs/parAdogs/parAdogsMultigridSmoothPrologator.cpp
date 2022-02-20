@@ -27,6 +27,8 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsGraph.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 parCSR* SmoothProlongator(const parCSR* A, const parCSR* T) {
@@ -365,6 +367,6 @@ parCSR* SmoothProlongator(const parCSR* A, const parCSR* T) {
   return P;
 }
 
-}
+} //namespace paradogs
 
-
+} //namespace libp

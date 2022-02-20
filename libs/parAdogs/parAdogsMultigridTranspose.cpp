@@ -34,6 +34,8 @@ using __gnu_parallel::sort;
 using std::sort;
 #endif
 
+namespace libp {
+
 namespace paradogs {
 
 parCSR* Transpose(const parCSR* A) {
@@ -207,6 +209,6 @@ parCSR* Transpose(const parCSR* A) {
   return AT;
 }
 
-}
+} //namespace paradogs
 
-
+} //namespace libp

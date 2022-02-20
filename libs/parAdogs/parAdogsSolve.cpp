@@ -28,6 +28,8 @@ SOFTWARE.
 #include "parAdogs/parAdogsGraph.hpp"
 #include "parAdogs/parAdogsPartition.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 /****************************************/
@@ -124,6 +126,6 @@ int graph_t::Solve(const int level,
   return cg_iter;
 }
 
-}
+} //namespace paradogs
 
-
+} //namespace libp

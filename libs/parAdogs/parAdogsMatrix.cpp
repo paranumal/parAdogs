@@ -36,6 +36,8 @@ using __gnu_parallel::sort;
 using std::sort;
 #endif
 
+namespace libp {
+
 namespace paradogs {
 
 std::mt19937 RNG;
@@ -62,7 +64,7 @@ void parCSR::SpMV(const dfloat alpha, dfloat *x,
       y[i] = alpha*result;
   }
 
-  halo->Exchange(x, 1, ogs::Dfloat);
+  halo.Exchange(x, 1, ogs::Dfloat);
 
   #pragma omp parallel for
   for(dlong i=0; i<offd.nzRows; i++){ //local
@@ -88,7 +90,7 @@ void parCSR::SpMV(const dfloat alpha, dfloat *x,
     z[i] = alpha*result + beta*y[i];
   }
 
-  halo->Exchange(x, 1, ogs::Dfloat);
+  halo.Exchange(x, 1, ogs::Dfloat);
 
   #pragma omp parallel for
   for(dlong i=0; i<offd.nzRows; i++){ //local
@@ -111,7 +113,7 @@ void parCSR::SpMV(const dfloat alpha, dfloat *x,
 parCSR::parCSR(dlong _Nrows, dlong _Ncols,
                const dlong NNZ,
                nonZero_t entries[],
-               platform_t &_platform,
+               const platform_t &_platform,
                MPI_Comm _comm):
   platform(_platform),
   comm(_comm) {
@@ -285,8 +287,7 @@ void parCSR::haloSetup(hlong colIds[]) {
 
   //make a halo exchange to share column entries and an ogs for gsops accross columns
   bool verbose = false;
-  halo = new ogs::halo_t(platform);
-  halo->Setup(Ncols, colMap, comm, ogs::Pairwise, verbose);
+  halo.Setup(Ncols, colMap, comm, ogs::Pairwise, verbose, platform);
 
   //shift back to 0-indexed
   for (dlong n=0; n<Ncols; n++) colMap[n]=abs(colMap[n])-1;
@@ -320,7 +321,6 @@ void parCSR::Free() {
   if (diagInv) {delete[] diagInv; diagInv=nullptr;}
 
   NlocalCols=0;
-  if (halo)   {delete halo; halo = nullptr;}
   if (colMap) {delete[] colMap; colMap=nullptr;}
 
   rho=0.0;
@@ -454,5 +454,6 @@ dfloat parCSR::rhoDinvA(dfloat null[]){
   return RHO;
 }
 
-
 } //namespace paradogs
+
+} //namespace libp

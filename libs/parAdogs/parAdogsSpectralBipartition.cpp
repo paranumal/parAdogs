@@ -28,6 +28,8 @@ SOFTWARE.
 #include "parAdogs/parAdogsGraph.hpp"
 #include "parAdogs/parAdogsPartition.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 /****************************************/
@@ -56,7 +58,7 @@ void graph_t::SpectralBipartition(const dfloat targetFraction[2]) {
   }
 
   /*Fill halo region of partition vector*/
-  L[0].A->halo->Exchange(partition, 1, ogs::Int32);
+  L[0].A->halo.Exchange(partition, 1, ogs::Int32);
 
   /*Split the graph according to this partitioning*/
   Split(partition);
@@ -67,5 +69,7 @@ void graph_t::SpectralBipartition(const dfloat targetFraction[2]) {
   delete[] partition;
 }
 
-}
+} //namespace paradogs
+
+} //namespace libp
 

@@ -28,6 +28,8 @@ SOFTWARE.
 #include "parAdogs/parAdogsMatrix.hpp"
 #include "parAdogs/parAdogsPartition.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
@@ -73,7 +75,7 @@ void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
       r[n] = diagInv[n]*rn;
     }
 
-    halo->Exchange(x, 1, ogs::Dfloat);
+    halo.Exchange(x, 1, ogs::Dfloat);
 
     #pragma omp parallel for
     for(dlong n=0; n<offd.nzRows; n++){ //local
@@ -125,7 +127,7 @@ void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
       r[n] += diagInv[n]*rn;
     }
 
-    halo->Exchange(d, 1, ogs::Dfloat);
+    halo.Exchange(d, 1, ogs::Dfloat);
 
     #pragma omp parallel for
     for(dlong n=0; n<offd.nzRows; n++){ //local
@@ -166,5 +168,6 @@ void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
   }
 }
 
+} //namespace paradogs
 
-}
+} //namespace libp

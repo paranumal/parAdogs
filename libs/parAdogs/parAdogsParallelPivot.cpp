@@ -37,6 +37,8 @@ using __gnu_parallel::partition;
 using std::partition;
 #endif
 
+namespace libp {
+
 namespace paradogs {
 
 static dfloat Pivot(dfloat A[],
@@ -101,5 +103,6 @@ dfloat ParallelPivot(const dlong N, dfloat F[],
   return pivot;
 }
 
-}
+} //namespace paradogs
 
+} //namespace libp

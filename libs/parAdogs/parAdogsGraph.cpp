@@ -27,6 +27,8 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsGraph.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 /*Build a graph from mesh connectivity info*/
@@ -36,11 +38,11 @@ graph_t::graph_t(platform_t &_platform,
                  const int _Nverts,
                  const int _Nfaces,
                  const int _NfaceVerts,
-                 const int* _faceVerts,
-                 const hlong EToV[],
-                 const dfloat EX[],
-                 const dfloat EY[],
-                 const dfloat EZ[],
+                 const libp::memory<int>& faceVertices,
+                 const libp::memory<hlong>& EToV,
+                 const libp::memory<dfloat>& EX,
+                 const libp::memory<dfloat>& EY,
+                 const libp::memory<dfloat>& EZ,
                  MPI_Comm _comm):
   platform(_platform),
   Nverts(_Nelements),
@@ -59,7 +61,7 @@ graph_t::graph_t(platform_t &_platform,
   MPI_Comm_size(comm, &size);
 
   for (int n=0;n<Nfaces*NfaceVerts;++n)
-    faceVerts[n] = _faceVerts[n];
+    faceVerts[n] = faceVertices[n];
 
   /*Global number of elements*/
   hlong localNverts=static_cast<hlong>(Nverts);
@@ -223,7 +225,7 @@ void graph_t::Split(const int partition[]) {
 
   if (L[0].A) {
     /*If we have connected the elements, share the newIds*/
-    L[0].A->halo->Exchange(newIds, 1, ogs::Hlong);
+    L[0].A->halo.Exchange(newIds, 1, ogs::Hlong);
 
     /*Then update the connectivity*/
     dlong cnt=0;
@@ -414,31 +416,24 @@ void graph_t::Report() {
 }
 
 void graph_t::ExtractMesh(dlong &Nelements_,
-                          hlong*  &EToV,
-                          hlong*  &EToE,
-                          int*    &EToF,
-                          dfloat* &EX,
-                          dfloat* &EY,
-                          dfloat* &EZ) {
+                          libp::memory<hlong>& EToV,
+                          libp::memory<hlong>& EToE,
+                          libp::memory<int>& EToF,
+                          libp::memory<dfloat>& EX,
+                          libp::memory<dfloat>& EY,
+                          libp::memory<dfloat>& EZ) {
 
-  /*Destroy any esiting mesh data and create new data from current graph*/
-  if (EToV) free(EToV);
-  if (EToE) free(EToE);
-  if (EToF) free(EToF);
-  if (EX) free(EX);
-  if (EY) free(EY);
-  if (dim==3 && EZ) free(EZ);
-
+  /*Destroy any exiting mesh data and create new data from current graph*/
   Nelements_ = Nelements;
 
-  EToV = (hlong*) malloc(Nelements*NelementVerts*sizeof(hlong));
-  EToE = (hlong*) malloc(Nelements*NelementVerts*sizeof(hlong));
-  EToF = (int*) malloc(Nelements*NelementVerts*sizeof(int));
+  EToV.malloc(Nelements*NelementVerts);
+  EToE.malloc(Nelements*NelementVerts);
+  EToF.malloc(Nelements*NelementVerts);
 
-  EX = (dfloat*) malloc(Nelements*NelementVerts*sizeof(dfloat));
-  EY = (dfloat*) malloc(Nelements*NelementVerts*sizeof(dfloat));
+  EX.malloc(Nelements*NelementVerts);
+  EY.malloc(Nelements*NelementVerts);
   if (dim==3)
-    EZ = (dfloat*) malloc(Nelements*NelementVerts*sizeof(dfloat));
+    EZ.malloc(Nelements*NelementVerts);
 
   if (dim==2) {
     for (dlong e=0;e<Nelements;++e) {
@@ -476,4 +471,6 @@ graph_t::~graph_t() {
   if (colIds) {delete[] colIds; colIds=nullptr;}
 }
 
-}
+} //namespace paradogs
+
+} //namespace libp

@@ -28,6 +28,8 @@ SOFTWARE.
 #include "parAdogs/parAdogsGraph.hpp"
 #include "parAdogs/parAdogsPartition.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 /****************************************/
@@ -137,6 +139,6 @@ void graph_t::Refine(const int level) {
   delete[] x;
 }
 
-}
+} //namespace paradogs
 
-
+} //namespace libp

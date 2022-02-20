@@ -26,6 +26,8 @@ SOFTWARE.
 
 #include "parAdogs.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 void AddSettings(settings_t& settings) {
@@ -42,3 +44,5 @@ void ReportSettings(settings_t& settings) {
 }
 
 } //namespace paradogs
+
+} //namespace libp

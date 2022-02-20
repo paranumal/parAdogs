@@ -27,6 +27,8 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsGraph.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 void coarseSolver_t::Solve(dfloat rhs[], dfloat x[]) {
@@ -160,6 +162,6 @@ void coarseSolver_t::Free() {
   if(grhs)          {delete[] grhs; grhs=nullptr; }
 }
 
-}
+} //namespace paradogs
 
-
+} //namespace libp

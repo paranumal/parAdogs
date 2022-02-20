@@ -27,6 +27,8 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsGraph.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 /****************************************/
@@ -73,7 +75,7 @@ void graph_t::MultigridSetup() {
 
     /*Check for stalls*/
     if (Lc.Nglobal > coarseTol*Lf.Nglobal) {
-      stringstream ss;
+      std::stringstream ss;
       ss << "Paradogs: Graph coarsening stalling. Coarse graph has " << Lc.Nglobal << " nodes.";
       LIBP_WARNING(ss.str())
       coarseSolver.Setup(Lc.A, Lc.null);
@@ -168,7 +170,7 @@ void mgLevel_t::CoarsenLevel(mgLevel_t& Lf, const dfloat theta) {
   }
 
   //fill the halo region
-  A->halo->Exchange(A->diagA, 1, ogs::Dfloat);
+  A->halo.Exchange(A->diagA, 1, ogs::Dfloat);
 
   Nrows = A->Nrows;
   Ncols = std::max(A->Ncols, Lf.P->Ncols);
@@ -197,7 +199,6 @@ void mgLevel_t::Free() {
   if (scratch) {delete[] scratch; scratch=nullptr; }
 }
 
+} //namespace paradogs
 
-}
-
-
+} //namespace libp

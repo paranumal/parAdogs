@@ -28,6 +28,8 @@ SOFTWARE.
 #include "parAdogs/parAdogsGraph.hpp"
 #include "parAdogs/parAdogsMultigrid.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 /****************************************/
@@ -87,6 +89,6 @@ void mgLevel_t::Smooth(dfloat r[], dfloat x[], const bool xIsZero) {
                      ChebyshevIterations);
 }
 
+} //namespace paradogs
 
-
-}
+} //namespace libp

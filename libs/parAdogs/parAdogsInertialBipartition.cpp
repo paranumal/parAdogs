@@ -32,6 +32,8 @@ extern "C" {
   void dsyev_ (char *JOBZ, char *UPLO, int *N, double *A, int *LDA, double *W, double *WORK, int *LWORK, int *INFO);
 }
 
+namespace libp {
+
 namespace paradogs {
 
 /****************************************/
@@ -213,5 +215,6 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
   delete[] partition;
 }
 
-}
+} //namespace paradogs
 
+} //namespace libp
