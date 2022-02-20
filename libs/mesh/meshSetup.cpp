@@ -25,53 +25,37 @@ SOFTWARE.
 */
 
 #include "mesh.hpp"
-#include "mesh/mesh2D.hpp"
-#include "mesh/mesh3D.hpp"
 
-mesh_t& mesh_t::Setup(platform_t& platform, meshSettings_t& settings,
-                      MPI_Comm comm){
+namespace libp {
 
-  string fileName;
-  int dim, elementType;
+void mesh_t::Setup(platform_t& _platform, meshSettings_t& _settings,
+                   MPI_Comm _comm){
 
+  platform = _platform;
+  settings = _settings;
+  props = platform.props();
+
+  MPI_Comm_dup(_comm, &comm);
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &size);
+
+  std::string fileName;
   settings.getSetting("MESH FILE", fileName);
   settings.getSetting("ELEMENT TYPE", elementType);
   settings.getSetting("MESH DIMENSION", dim);
 
-  mesh_t *mesh=NULL;
-  switch(elementType){
-  case TRIANGLES:
-    if(dim==2)
-      mesh = new meshTri2D(platform, settings, comm);
-    else
-      mesh = new meshTri3D(platform, settings, comm);
-    break;
-  case QUADRILATERALS:
-    if(dim==2)
-      mesh = new meshQuad2D(platform, settings, comm);
-    else
-      mesh = new meshQuad3D(platform, settings, comm);
-    break;
-  case TETRAHEDRA:
-    mesh = new meshTet3D(platform, settings, comm);
-    break;
-  case HEXAHEDRA:
-    mesh = new meshHex3D(platform, settings, comm);
-    break;
-  }
-
-  mesh->elementType = elementType;
+  SetElementType(elementType);
 
   if (settings.compareSetting("MESH FILE","BOX")) {
     //build a box mesh
-    mesh->SetupBox();
+    SetupBox();
   } else {
     // read chunk of elements from file
-    mesh->ParallelReader(fileName.c_str());
+    ParallelReader(fileName);
   }
 
   // partition mesh among processes
-  mesh->Partition();
-
-  return *mesh;
+  Partition();
 }
+
+} //namespace libp

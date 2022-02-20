@@ -26,8 +26,10 @@ SOFTWARE.
 
 #include "mesh.hpp"
 
+namespace libp {
+
 //plot field at vertices
-void mesh_t::Plot(const dfloat* q){
+void mesh_t::Plot(const libp::memory<dfloat>& q){
 
   FILE *fp;
 
@@ -119,3 +121,5 @@ void mesh_t::Plot(const dfloat* q){
   fprintf(fp, "</VTKFile>\n");
   fclose(fp);
 }
+
+} //namespace libp

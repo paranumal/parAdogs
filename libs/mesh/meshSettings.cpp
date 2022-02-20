@@ -27,6 +27,8 @@ SOFTWARE.
 #include "mesh.hpp"
 #include "parAdogs.hpp"
 
+namespace libp {
+
 meshSettings_t::meshSettings_t(MPI_Comm& _comm):
   settings_t(_comm) {
 
@@ -134,3 +136,5 @@ void meshSettings_t::report() {
     paradogs::ReportSettings(*this);
   }
 }
+
+} //namespace libp

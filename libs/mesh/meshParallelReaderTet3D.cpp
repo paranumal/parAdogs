@@ -25,29 +25,18 @@ SOFTWARE.
 */
 
 #include "mesh.hpp"
-#include "mesh/mesh3D.hpp"
+
+namespace libp {
 
 /*
    purpose: read gmsh tetrahedra mesh
 */
-void meshTet3D::ParallelReader(const char *fileName){
+void mesh_t::ParallelReaderTet3D(const std::string fileName){
 
-  FILE *fp = fopen(fileName, "r");
-
-  dim = 3;
-  Nverts = 4; // number of vertices per element
-  Nfaces = 4;
-
-  // vertices on each face
-  int faceVertices_[4][3] = {{0,1,2},{0,1,3},{1,2,3},{2,0,3}};
-
-  NfaceVertices = 3;
-  faceVertices =
-    (int*) calloc(NfaceVertices*Nfaces, sizeof(int));
-  memcpy(faceVertices, faceVertices_[0], 12*sizeof(int));
+  FILE *fp = fopen(fileName.c_str(), "r");
 
   if(fp==NULL){
-    stringstream ss;
+    std::stringstream ss;
     ss << "Cannot open file: " << fileName;
     LIBP_ABORT(ss.str())
   }
@@ -55,7 +44,7 @@ void meshTet3D::ParallelReader(const char *fileName){
   char buf[BUFSIZ];
   do{
     if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      stringstream ss;
+      std::stringstream ss;
       ss << "Error reading mesh file: " << fileName;
       LIBP_ABORT(ss.str())
     }
@@ -63,32 +52,32 @@ void meshTet3D::ParallelReader(const char *fileName){
 
   /* read number of nodes in mesh */
   if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-    stringstream ss;
+    std::stringstream ss;
     ss << "Error reading mesh file: " << fileName;
     LIBP_ABORT(ss.str())
   }
   sscanf(buf, hlongFormat, &(Nnodes));
 
   /* allocate space for node coordinates */
-  dfloat *VX = (dfloat*) calloc(Nnodes, sizeof(dfloat));
-  dfloat *VY = (dfloat*) calloc(Nnodes, sizeof(dfloat));
-  dfloat *VZ = (dfloat*) calloc(Nnodes, sizeof(dfloat));
+  libp::memory<dfloat> VX(Nnodes);
+  libp::memory<dfloat> VY(Nnodes);
+  libp::memory<dfloat> VZ(Nnodes);
 
   /* load nodes */
   for(hlong n=0;n<Nnodes;++n){
     if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      stringstream ss;
+      std::stringstream ss;
       ss << "Error reading mesh file: " << fileName;
       LIBP_ABORT(ss.str())
     }
     sscanf(buf, "%*d" dfloatFormat dfloatFormat dfloatFormat,
-           VX+n, VY+n, VZ+n);
+           VX.ptr()+n, VY.ptr()+n, VZ.ptr()+n);
   }
 
   /* look for section with Element node data */
   do{
     if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      stringstream ss;
+      std::stringstream ss;
       ss << "Error reading mesh file: " << fileName;
       LIBP_ABORT(ss.str())
     }
@@ -97,7 +86,7 @@ void meshTet3D::ParallelReader(const char *fileName){
   /* read number of nodes in mesh */
   hlong gNelements;
   if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-    stringstream ss;
+    std::stringstream ss;
     ss << "Error reading mesh file: " << fileName;
     LIBP_ABORT(ss.str())
   }
@@ -110,7 +99,7 @@ void meshTet3D::ParallelReader(const char *fileName){
   for(hlong n=0;n<gNelements;++n){
     int ElementType;
     if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      stringstream ss;
+      std::stringstream ss;
       ss << "Error reading mesh file: " << fileName;
       LIBP_ABORT(ss.str())
     }
@@ -127,33 +116,30 @@ void meshTet3D::ParallelReader(const char *fileName){
   hlong NtetsLocal = chunk + (rank<remainder);
 
   /* where do these elements start ? */
-  hlong start = rank*chunk + mymin(rank, remainder);
+  hlong start = rank*chunk + std::min(rank, remainder);
   hlong end = start + NtetsLocal-1;
 
   /* allocate space for Element node index data */
-
-  EToV
-    = (hlong*) calloc(NtetsLocal*Nverts, sizeof(hlong));
-  elementInfo
-    = (hlong*) calloc(NtetsLocal,sizeof(hlong));
+  EToV.malloc(NtetsLocal*Nverts);
+  elementInfo.malloc(NtetsLocal);
 
   /* scan through file looking for tetrahedra elements */
   hlong cnt=0, bcnt = 0;
   Ntets = 0;
 
-  boundaryInfo = (hlong*) calloc(gNboundaryFaces*4, sizeof(hlong));
+  boundaryInfo.malloc(gNboundaryFaces*4);
   for(hlong n=0;n<gNelements;++n){
     int ElementType;
     hlong v1, v2, v3, v4;
     if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      stringstream ss;
+      std::stringstream ss;
       ss << "Error reading mesh file: " << fileName;
       LIBP_ABORT(ss.str())
     }
     sscanf(buf, "%*d%d", &ElementType);
     if(ElementType==2){ // boundary face
       sscanf(buf, "%*d%*d %*d" hlongFormat "%*d" hlongFormat hlongFormat hlongFormat,
-             boundaryInfo+bcnt*4, &v1, &v2, &v3);
+             boundaryInfo.ptr()+bcnt*4, &v1, &v2, &v3);
       boundaryInfo[bcnt*4+1] = v1-1;
       boundaryInfo[bcnt*4+2] = v2-1;
       boundaryInfo[bcnt*4+3] = v3-1;
@@ -165,7 +151,7 @@ void meshTet3D::ParallelReader(const char *fileName){
         sscanf(buf,
                "%*d%*d%*d " hlongFormat " %*d"
                hlongFormat hlongFormat hlongFormat hlongFormat,
-               elementInfo+cnt,&v1, &v2, &v3, &v4);
+               elementInfo.ptr()+cnt,&v1, &v2, &v3, &v4);
         /* read vertex triplet for trianngle */
         EToV[cnt*Nverts+0] = v1-1;
         EToV[cnt*Nverts+1] = v2-1;
@@ -185,9 +171,9 @@ void meshTet3D::ParallelReader(const char *fileName){
   Nelements = (dlong) NtetsLocal;
 
   /* collect vertices for each element */
-  EX = (dfloat*) calloc(Nverts*Nelements, sizeof(dfloat));
-  EY = (dfloat*) calloc(Nverts*Nelements, sizeof(dfloat));
-  EZ = (dfloat*) calloc(Nverts*Nelements, sizeof(dfloat));
+  EX.malloc(Nverts*Nelements);
+  EY.malloc(Nverts*Nelements);
+  EZ.malloc(Nverts*Nelements);
   for(dlong e=0;e<Nelements;++e){
     for(int n=0;n<Nverts;++n){
       hlong vid = EToV[e*Nverts+n];
@@ -196,11 +182,6 @@ void meshTet3D::ParallelReader(const char *fileName){
       EZ[e*Nverts+n] = VZ[vid];
     }
   }
-
-  /* release VX and VY (these are too big to keep) */
-  free(VX);
-  free(VY);
-  free(VZ);
-
 }
 
+} //namespace libp

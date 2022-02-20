@@ -25,41 +25,28 @@ SOFTWARE.
 */
 
 #include "mesh.hpp"
-#include "mesh/mesh2D.hpp"
+
+namespace libp {
 
 /*
    purpose: read gmsh triangle mesh
 */
-void meshTri2D::ParallelReader(const char *fileName){
+void mesh_t::ParallelReaderTri2D(const std::string fileName){
 
-  FILE *fp = fopen(fileName, "r");
-
-  dim = 2;
-  Nverts = 3; // number of vertices per element
-  Nfaces = 3;
-  NfaceVertices = 2;
-
-  /* vertices on each face */
-  int faceVertices_[4][2] = {{0,1},{1,2},{2,0}};
-
-  faceVertices =
-    (int*) calloc(NfaceVertices*Nfaces, sizeof(int));
-
-  memcpy(faceVertices, faceVertices_[0], NfaceVertices*Nfaces*sizeof(int));
+  FILE *fp = fopen(fileName.c_str(), "r");
 
   if(fp==NULL){
-    stringstream ss;
+    std::stringstream ss;
     ss << "Cannot open file: " << fileName;
     LIBP_ABORT(ss.str())
   }
 
   char buf[BUFSIZ];
 
-
   // look for Nodes section
   do{
     if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      stringstream ss;
+      std::stringstream ss;
       ss << "Error reading mesh file: " << fileName;
       LIBP_ABORT(ss.str())
     }
@@ -67,30 +54,30 @@ void meshTri2D::ParallelReader(const char *fileName){
 
   /* read number of nodes in mesh */
   if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-    stringstream ss;
+    std::stringstream ss;
     ss << "Error reading mesh file: " << fileName;
     LIBP_ABORT(ss.str())
   }
   sscanf(buf, hlongFormat, &(Nnodes));
 
   /* allocate space for node coordinates */
-  dfloat *VX = (dfloat*) calloc(Nnodes, sizeof(dfloat));
-  dfloat *VY = (dfloat*) calloc(Nnodes, sizeof(dfloat));
+  libp::memory<dfloat> VX(Nnodes);
+  libp::memory<dfloat> VY(Nnodes);
 
   /* load nodes */
   for(hlong n=0;n<Nnodes;++n){
     if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      stringstream ss;
+      std::stringstream ss;
       ss << "Error reading mesh file: " << fileName;
       LIBP_ABORT(ss.str())
     }
-    sscanf(buf, "%*d" dfloatFormat dfloatFormat, VX+n, VY+n);
+    sscanf(buf, "%*d" dfloatFormat dfloatFormat, VX.ptr()+n, VY.ptr()+n);
   }
 
   /* look for section with Element node data */
   do{
     if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      stringstream ss;
+      std::stringstream ss;
       ss << "Error reading mesh file: " << fileName;
       LIBP_ABORT(ss.str())
     }
@@ -99,7 +86,7 @@ void meshTri2D::ParallelReader(const char *fileName){
   /* read number of elements in mesh */
   hlong gNelements;
   if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-    stringstream ss;
+    std::stringstream ss;
     ss << "Error reading mesh file: " << fileName;
     LIBP_ABORT(ss.str())
   }
@@ -113,7 +100,7 @@ void meshTri2D::ParallelReader(const char *fileName){
   for(hlong n=0;n<gNelements;++n){
     int ElementType;
     if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      stringstream ss;
+      std::stringstream ss;
       ss << "Error reading mesh file: " << fileName;
       LIBP_ABORT(ss.str())
     }
@@ -130,34 +117,30 @@ void meshTri2D::ParallelReader(const char *fileName){
   hlong NtrianglesLocal = chunk + (rank<remainder);
 
   /* where do these elements start ? */
-  hlong start = rank*chunk + mymin(rank, remainder);
+  hlong start = rank*chunk + std::min(rank, remainder);
   hlong end   = start + NtrianglesLocal-1;
 
   /* allocate space for Element node index data */
-
-  EToV
-    = (hlong*) calloc(NtrianglesLocal*Nverts,
-                     sizeof(hlong));
-  elementInfo
-    = (hlong*) calloc(NtrianglesLocal,sizeof(hlong));
+  EToV.malloc(NtrianglesLocal*Nverts);
+  elementInfo.malloc(NtrianglesLocal);
 
   /* scan through file looking for triangle elements */
   hlong cnt=0, bcnt=0;
   Ntriangles = 0;
 
-  boundaryInfo = (hlong*) calloc(gNboundaryFaces*3, sizeof(hlong));
+  boundaryInfo.malloc(gNboundaryFaces*3);
   for(hlong n=0;n<gNelements;++n){
     int ElementType;
     hlong v1, v2, v3;
     if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      stringstream ss;
+      std::stringstream ss;
       ss << "Error reading mesh file: " << fileName;
       LIBP_ABORT(ss.str())
     }
     sscanf(buf, "%*d%d", &ElementType);
     if(ElementType==1){ // boundary face
       sscanf(buf, "%*d%*d %*d" hlongFormat "%*d" hlongFormat hlongFormat,
-             boundaryInfo+bcnt*3, &v1, &v2);
+             boundaryInfo.ptr()+bcnt*3, &v1, &v2);
       boundaryInfo[bcnt*3+1] = v1-1;
       boundaryInfo[bcnt*3+2] = v2-1;
       ++bcnt;
@@ -165,7 +148,7 @@ void meshTri2D::ParallelReader(const char *fileName){
     if(ElementType==2){  // triangle
       if(start<=Ntriangles && Ntriangles<=end){
         sscanf(buf, "%*d%*d%*d " hlongFormat " %*d" hlongFormat hlongFormat hlongFormat,
-               elementInfo+cnt, &v1, &v2, &v3);
+               elementInfo.ptr()+cnt, &v1, &v2, &v3);
 
         // check orientation
         dfloat xe1 = VX[v1-1], xe2 = VX[v2-1], xe3 = VX[v3-1];
@@ -197,17 +180,14 @@ void meshTri2D::ParallelReader(const char *fileName){
   Nelements = (dlong) NtrianglesLocal;
 
   /* collect vertices for each element */
-  EX = (dfloat*) calloc(Nverts*Nelements, sizeof(dfloat));
-  EY = (dfloat*) calloc(Nverts*Nelements, sizeof(dfloat));
+  EX.malloc(Nverts*Nelements);
+  EY.malloc(Nverts*Nelements);
   for(dlong e=0;e<Nelements;++e){
     for(int n=0;n<Nverts;++n){
       EX[e*Nverts+n] = VX[EToV[e*Nverts+n]];
       EY[e*Nverts+n] = VY[EToV[e*Nverts+n]];
     }
   }
-
-  /* release VX and VY (these are too big to keep) */
-  free(VX);
-  free(VY);
 }
 
+} //namespace libp

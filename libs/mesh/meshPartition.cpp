@@ -27,6 +27,8 @@ SOFTWARE.
 #include "mesh.hpp"
 #include "parAdogs.hpp"
 
+namespace libp {
+
 void mesh_t::Partition(){
 
   paradogs::MeshPartition(platform,
@@ -46,13 +48,13 @@ void mesh_t::Partition(){
                           comm);
 
   /*Plot the resulting partition*/
-  dfloat *q = new dfloat[Nelements*Nverts];
+  libp::memory<dfloat> q(Nelements*Nverts);
 
   for (dlong e=0;e<Nelements;e++)
     for (dlong n=0;n<Nverts;n++)
       q[n+e*Nverts] = rank;
 
   Plot(q);
-
-  delete[] q;
 }
+
+} //namespace libp
