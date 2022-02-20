@@ -2,7 +2,7 @@
 
 The MIT License (MIT)
 
-Copyright (c) 2017 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
+Copyright (c) 2020 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,8 @@ SOFTWARE.
 
 #include "platform.hpp"
 #include "omp.h"
+
+namespace libp {
 
 // OCCA build stuff
 void platform_t::DeviceConfig(){
@@ -52,22 +54,24 @@ void platform_t::DeviceConfig(){
   int plat=0;
   int device_id=0;
 
-  if(settings.compareSetting("THREAD MODEL", "OpenCL"))
-    settings.getSetting("PLATFORM NUMBER", plat);
+  settings_t& Settings = settings();
 
-  // read thread model/device/platform from settings
+  if(Settings.compareSetting("THREAD MODEL", "OpenCL"))
+    Settings.getSetting("PLATFORM NUMBER", plat);
+
+  // read thread model/device/platform from Settings
   std::string mode;
 
-  if(settings.compareSetting("THREAD MODEL", "CUDA")){
+  if(Settings.compareSetting("THREAD MODEL", "CUDA")){
     mode = "{mode: 'CUDA'}";
   }
-  else if(settings.compareSetting("THREAD MODEL", "HIP")){
+  else if(Settings.compareSetting("THREAD MODEL", "HIP")){
     mode = "{mode: 'HIP'}";
   }
-  else if(settings.compareSetting("THREAD MODEL", "OpenCL")){
+  else if(Settings.compareSetting("THREAD MODEL", "OpenCL")){
     mode = "{mode: 'OpenCL', platform_id : " + std::to_string(plat) +"}";
   }
-  else if(settings.compareSetting("THREAD MODEL", "OpenMP")){
+  else if(Settings.compareSetting("THREAD MODEL", "OpenMP")){
     mode = "{mode: 'OpenMP'}";
   }
   else{
@@ -75,12 +79,12 @@ void platform_t::DeviceConfig(){
   }
 
   //add a device_id number for some modes
-  if (  settings.compareSetting("THREAD MODEL", "CUDA")
-      ||settings.compareSetting("THREAD MODEL", "HIP")
-      ||settings.compareSetting("THREAD MODEL", "OpenCL")) {
+  if (  Settings.compareSetting("THREAD MODEL", "CUDA")
+      ||Settings.compareSetting("THREAD MODEL", "HIP")
+      ||Settings.compareSetting("THREAD MODEL", "OpenCL")) {
     //for testing a single device, run with 1 rank and specify DEVICE NUMBER
     if (size==1) {
-      settings.getSetting("DEVICE NUMBER",device_id);
+      Settings.getSetting("DEVICE NUMBER",device_id);
     } else {
 
       device_id = localRank;
@@ -88,7 +92,7 @@ void platform_t::DeviceConfig(){
       //check for over-subscribing devices
       int deviceCount = occa::getDeviceCount(mode);
       if (deviceCount>0 && localRank>=deviceCount) {
-        stringstream ss;
+        std::stringstream ss;
         ss << "Rank " << rank << " oversubscribing device " << device_id%deviceCount << " on node \"" << hostname<< "\"";
         LIBP_WARNING(ss.str());
         device_id = device_id%deviceCount;
@@ -124,28 +128,58 @@ void platform_t::DeviceConfig(){
 
   // int Ncores = omp_get_num_procs();
   int NcoresPerNode = Ncores*Nsockets;
-  int Nthreads = NcoresPerNode/localSize;
-  if (Nthreads==0) {
-    stringstream ss;
+  int Nthreads=0;
+
+#if !defined(LIBP_DEBUG)
+  /*Check OMP_NUM_THREADS env variable*/
+  std::string ompNumThreads;
+  char * ompEnvVar = std::getenv("OMP_NUM_THREADS");
+  if (ompEnvVar == nullptr) { // Environment variable is not set
+    Nthreads = std::max(NcoresPerNode/localSize, 1); //Evenly divide number of cores
+  } else {
+    ompNumThreads = ompEnvVar;
+    // Environmet variable is set, but could be empty string
+    if (ompNumThreads.size() == 0) {
+      // Environment variable is set but equal to empty string
+      Nthreads = std::max(NcoresPerNode/localSize, 1); //Evenly divide number of cores;
+    } else {
+      Nthreads = std::stoi(ompNumThreads);
+    }
+  }
+  if (Nthreads*localSize>NcoresPerNode) {
+    std::stringstream ss;
     ss << "Rank " << rank << " oversubscribing CPU on node \"" << hostname<< "\"";
     LIBP_WARNING(ss.str());
-    Nthreads = 1;
   }
-#if !defined(LIBP_DEBUG)
   omp_set_num_threads(Nthreads);
   // omp_set_num_threads(1);
 
   // if (settings.compareSetting("VERBOSE","TRUE"))
-    // printf("Rank %d: Nsockets = %d, NcoresPerSocket = %d, Nthreads = %d, device_id = %d \n",
-    //        rank, Nsockets, Ncores, Nthreads, device_id);
+  //   printf("Rank %d: Nsockets = %d, NcoresPerSocket = %d, Nthreads = %d, device_id = %d \n",
+  //          rank, Nsockets, Ncores, Nthreads, device_id);
 #endif
 
   device.setup(mode);
 
-  std::string occaCacheDir = LIBP_DIR "/.occa";
-  settings.getSetting("CACHE DIR", occaCacheDir);
+  std::string occaCacheDir;
+  char * cacheEnvVar = std::getenv("STREAMPARANUMAL_CACHE_DIR");
+  if (cacheEnvVar == nullptr) {
+    // Environment variable is not set
+    occaCacheDir = LIBP_DIR "/.occa";
+  }
+  else {
+    // Environmet variable is set, but could be empty string
+    occaCacheDir = cacheEnvVar;
+
+    if (occaCacheDir.size() == 0) {
+      // Environment variable is set but equal to empty string
+      occaCacheDir = LIBP_DIR "/.occa";
+    }
+  }
   occa::env::setOccaCacheDir(occaCacheDir);
 
   MPI_Barrier(MPI_COMM_WORLD);
   free(hostnames);
 }
+
+} //namespace libp

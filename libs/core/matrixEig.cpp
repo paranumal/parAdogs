@@ -2,7 +2,7 @@
 
 The MIT License (MIT)
 
-Copyright (c) 2017 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
+Copyright (c) 2020 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,13 +26,14 @@ SOFTWARE.
 
 #include "core.hpp"
 
-
 extern "C" {
   void sgeev_(char *JOBVL, char *JOBVR, int *N, float *A, int *LDA, float *WR, float *WI,
               float *VL, int *LDVL, float *VR, int *LDVR, float *WORK, int *LWORK, int *INFO );
   void dgeev_(char *JOBVL, char *JOBVR, int *N, double *A, int *LDA, double *WR, double *WI,
               double *VL, int *LDVL, double *VR, int *LDVR, double *WORK, int *LWORK, int *INFO );
 }
+
+namespace libp {
 
 // compute right eigenvectors
 void matrixEigenVectors(int N, double *A, double *VR, double *WR, double *WI){
@@ -177,3 +178,5 @@ void matrixEigenValues(int N, float *A, float *WR, float *WI){
 
   free(WORK);
 }
+
+} //namespace libp

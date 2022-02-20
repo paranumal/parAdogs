@@ -26,8 +26,17 @@ SOFTWARE.
 
 #include "settings.hpp"
 
-setting_t::setting_t(string name_, string val_, string description_, vector<string> options_)
-  : name{name_}, val{val_}, description{description_}, options{options_} {}
+namespace libp {
+
+using std::vector;
+using std::string;
+
+setting_t::setting_t(string name_, string val_,
+                     string description_, vector<string> options_):
+  name{name_},
+  val{val_},
+  description{description_},
+  options{options_} {}
 
 const string& setting_t::getName() const {
   return name;
@@ -83,7 +92,7 @@ string setting_t::toString() const {
   return ss.str();
 }
 
-std::ostream& operator<<(ostream& os, const setting_t& setting) {
+std::ostream& operator<<(std::ostream& os, const setting_t& setting) {
   os << setting.toString();
   return os;
 }
@@ -96,8 +105,7 @@ void settings_t::newSetting(const string name, const string val,
                             const vector<string> options) {
   auto search = settings.find(name);
   if (search == settings.end()) {
-    setting_t *S = new setting_t(name, val, description, options);
-    settings[name] = S;
+    settings[name] = setting_t(name, val, description, options);
     insertOrder.push_back(name);
   } else {
     stringstream ss;
@@ -117,8 +125,8 @@ bool settings_t::hasSetting(const string name) {
 void settings_t::changeSetting(const string name, const string newVal) {
   auto search = settings.find(name);
   if (search != settings.end()) {
-    setting_t* val = search->second;
-    val->updateVal(newVal);
+    setting_t& val = search->second;
+    val.updateVal(newVal);
   } else {
     stringstream ss;
     ss << "Setting with name: [" << name << "] does not exist.";
@@ -214,8 +222,8 @@ void settings_t::readSettingsFromFile(string filename) {
 string settings_t::getSetting(const string name) const {
   auto search = settings.find(name);
   if (search != settings.end()) {
-    setting_t* val = search->second;
-    return val->getVal<string>();
+    const setting_t& val = search->second;
+    return val.getVal<string>();
   } else {
     stringstream ss;
     ss << "Unable to find setting: [" << name << "]";
@@ -227,8 +235,8 @@ string settings_t::getSetting(const string name) const {
 bool settings_t::compareSetting(const string name, const string token) const {
   auto search = settings.find(name);
   if (search != settings.end()) {
-    setting_t* val = search->second;
-    return val->compareVal(token);
+    const setting_t& val = search->second;
+    return val.compareVal(token);
   } else {
     stringstream ss;
     ss << "Unable to find setting: [" << name.c_str() << "]";
@@ -241,16 +249,16 @@ void settings_t::report() {
   std::cout << "Settings:\n\n";
   for (size_t i = 0; i < insertOrder.size(); ++i) {
     const string &s = insertOrder[i];
-    setting_t* val = settings[s];
-    std::cout << *val << std::endl;
+    const setting_t& val = settings[s];
+    std::cout << val << std::endl;
   }
 }
 
 void settings_t::reportSetting(const string name) const {
   auto search = settings.find(name);
   if (search != settings.end()) {
-    setting_t* val = search->second;
-    std::cout << *val << std::endl;
+    const setting_t& val = search->second;
+    std::cout << val << std::endl;
   } else {
     stringstream ss;
     ss << "Unable to find setting: [" << name.c_str() << "]";
@@ -258,7 +266,4 @@ void settings_t::reportSetting(const string name) const {
   }
 }
 
-settings_t::~settings_t() {
-  for(auto it = settings.begin(); it != settings.end(); ++it)
-    delete it->second;
-}
+} //namespace libp

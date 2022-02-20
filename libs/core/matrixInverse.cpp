@@ -2,7 +2,7 @@
 
 The MIT License (MIT)
 
-Copyright (c) 2017 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
+Copyright (c) 2020 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,8 @@ extern "C" {
   void sgetrf_(int* M, int *N, float* A, int* lda, int* IPIV, int* INFO);
   void sgetri_(int* N, float* A, int* lda, int* IPIV, float* WORK, int* lwork, int* INFO);
 }
+
+namespace libp {
 
 void matrixInverse(int N, double *A){
   int lwork = N*N;
@@ -89,3 +91,5 @@ void matrixInverse(int N, float *A){
   free(work);
   free(ipiv);
 }
+
+} //namespace libp

@@ -24,30 +24,12 @@ SOFTWARE.
 
 */
 
-#include "platform.hpp"
+#include "core.hpp"
 
 namespace libp {
-
-occa::kernel platform_t::buildKernel(std::string fileName, std::string kernelName,
-                                     occa::properties& kernelInfo){
-
-  assertInitialized();
-
-  occa::kernel kernel;
-
-  //build on root first
-  if (!rank)
-    kernel = device.buildKernel(fileName, kernelName, kernelInfo);
-
-  MPI_Barrier(comm);
-
-  //remaining ranks find the cached version (ideally)
-  if (rank)
-    kernel = device.buildKernel(fileName, kernelName, kernelInfo);
-
-  MPI_Barrier(comm);
-
-  return kernel;
-}
-
+  /*explicit instantiation of common specializations*/
+  template class memory<int>;
+  template class memory<long long int>;
+  template class memory<float>;
+  template class memory<double>;
 } //namespace libp

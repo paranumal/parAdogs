@@ -26,6 +26,8 @@ SOFTWARE.
 
 #include "platform.hpp"
 
+namespace libp {
+
 platformSettings_t::platformSettings_t(MPI_Comm _comm):
   settings_t(_comm) {
 
@@ -75,3 +77,5 @@ void platformSettings_t::report() {
       reportSetting("DEVICE NUMBER");
   }
 }
+
+} //namespace libp
