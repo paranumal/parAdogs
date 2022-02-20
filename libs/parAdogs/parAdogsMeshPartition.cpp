@@ -69,6 +69,8 @@ void MeshPartition(platform_t &platform,
                 EZ,
                 comm);
 
+  double timeStart = MPI_Wtime();
+
   if (settings.compareSetting("PARADOGS PARTITIONING", "INERTIAL")) {
     /*Inertial partitioning*/
     graph.InertialPartition();
@@ -86,8 +88,18 @@ void MeshPartition(platform_t &platform,
   /*Reorder rank-local element list for better locality*/
   graph.CuthillMckee();
 
+  double timeEnd = MPI_Wtime();
+  double elaplsed = timeEnd-timeStart;
+  MPI_Allreduce(MPI_IN_PLACE, &elaplsed, 1, MPI_DOUBLE, MPI_MAX, comm);
+
   /*Print some stats about the partitioning*/
   graph.Report();
+
+  if (rank==0) {
+    printf("   Partitioning time:  %5.2f seconds                                                          |\n",
+           elaplsed);
+    printf("-----------------------------------------------------------------------------------------------\n");
+  }
 
   /*Get the new mesh data*/
   graph.ExtractMesh(Nelements,
