@@ -30,12 +30,16 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsGraph.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 dfloat ParallelPivot(const dlong N, dfloat F[],
                      const hlong k, MPI_Comm comm);
 
-}
+} //namespace paradogs
+
+} //namespace libp
 
 #endif
 

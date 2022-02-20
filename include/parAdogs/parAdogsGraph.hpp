@@ -31,15 +31,19 @@ SOFTWARE.
 #include "parAdogs/parAdogsMatrix.hpp"
 #include "parAdogs/parAdogsMultigrid.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
-#define MAX_NVERTS 8
-#define MAX_NFACES 6
-#define MAX_NFACEVERTS 4
-
 class graph_t {
+public:
+  /*Mesh data*/
+  static constexpr int MAX_NVERTS=8;
+  static constexpr int MAX_NFACES=6;
+  static constexpr int MAX_NFACEVERTS=4;
+
 private:
-  platform_t &platform;
+  platform_t platform;
 
   MPI_Comm gcomm=MPI_COMM_NULL;
   MPI_Comm comm=MPI_COMM_NULL;
@@ -53,7 +57,7 @@ private:
   hlong gNVertsGlobal=0;
   hlong gVoffsetL=0, gVoffsetU=0;
   
-  /*Mesh data*/
+
   dlong Nelements=0;
   int dim=0;
   int Nfaces=0;
@@ -87,11 +91,11 @@ public:
           const int _Nverts,
           const int _Nfaces,
           const int _NfaceVerts,
-          const int* _faceVerts,
-          const hlong EToV[],
-          const dfloat EX[],
-          const dfloat EY[],
-          const dfloat EZ[],
+          const libp::memory<int>& faceVertices,
+          const libp::memory<hlong>& EToV,
+          const libp::memory<dfloat>& EX,
+          const libp::memory<dfloat>& EY,
+          const libp::memory<dfloat>& EZ,
           MPI_Comm _comm);
 
   ~graph_t();
@@ -107,12 +111,12 @@ public:
   void Report();
 
   void ExtractMesh(dlong &Nelements_,
-                   hlong*  &EToV,
-                   hlong*  &EToE,
-                   int*    &EToF,
-                   dfloat* &EX,
-                   dfloat* &EY,
-                   dfloat* &EZ);
+                   libp::memory<hlong>& EToV,
+                   libp::memory<hlong>& EToE,
+                   libp::memory<int>& EToF,
+                   libp::memory<dfloat>& EX,
+                   libp::memory<dfloat>& EY,
+                   libp::memory<dfloat>& EZ);
 
 private:
   void InertialBipartition(const dfloat targetFraction[2]);
@@ -148,7 +152,9 @@ private:
   void MultigridDestroy();
 };
 
-}
+} //namespace paradogs
+
+} //namespace libp
 
 #endif
 

@@ -65,12 +65,4 @@ SOFTWARE.
        << std::string(74, '=') << '\n';                             \
   }
 
-#define mymax(a,b) (((a)>(b))?(a):(b))
-#define mymin(a,b) (((a)<(b))?(a):(b))
-
-// block size for reduction (hard coded)
-#define BLOCKSIZE 256
-
-
-
 #endif

@@ -28,28 +28,30 @@ SOFTWARE.
 #define SETTINGS_HPP
 
 #include <string>
+#include <cstring>
 #include <vector>
 #include <ostream>
 #include <sstream>
 #include <fstream>
 #include "core.hpp"
 
-using std::string;
-using std::vector;
-using std::ostream;
-using std::stringstream;
+namespace libp {
 
 class setting_t {
+  using string = std::string;
+  using stringstream = std::stringstream;
+
 private:
   string name;
   string val;
 
   string description;
-  vector<string> options;
+  std::vector<string> options;
 
 public:
   setting_t() = default;
-  setting_t(string name_, string val_, string description_="", vector<string> options_={});
+  setting_t(string name_, string val_,
+            string description_="", std::vector<string> options_={});
 
   ~setting_t() = default;
 
@@ -58,7 +60,7 @@ public:
 
   const string& getName() const;
   const string& getDescription() const;
-  const vector<string>& getOptions() const;
+  const std::vector<string>& getOptions() const;
 
   template<typename T>
   T getVal() const {
@@ -75,28 +77,29 @@ public:
   string toString() const;
 };
 
-ostream& operator<<(ostream& os, const setting_t& setting);
+std::ostream& operator<<(std::ostream& os, const setting_t& setting);
 
 class settings_t {
+  using string = std::string;
+  using stringstream = std::stringstream;
+
 private:
-  vector<string> insertOrder;
+  std::vector<string> insertOrder;
 
 public:
-  const MPI_Comm comm;
-  std::map<string, setting_t*> settings;
+  MPI_Comm comm = MPI_COMM_NULL;
+  std::map<string, setting_t> settings;
 
-  settings_t() = delete;
+  settings_t() = default;
   settings_t(MPI_Comm _comm);
 
-  ~settings_t();
-
   //copy
-  settings_t(const settings_t& other);
-  settings_t& operator=(const settings_t& other);
+  settings_t(const settings_t& other)=default;
+  settings_t& operator=(const settings_t& other)=default;
 
   void newSetting(const string name, const string val,
-                          const string description="",
-                          const vector<string> options={});
+                  const string description="",
+                  const std::vector<string> options={});
 
   bool hasSetting(const string name);
 
@@ -109,8 +112,8 @@ public:
   void getSetting(const string name, T& value) const {
     auto search = settings.find(name);
     if (search != settings.end()) {
-      setting_t* val = search->second;
-      value = val->getVal<T>();
+      const setting_t& val = search->second;
+      value = val.getVal<T>();
     } else {
       stringstream ss;
       ss << "Unable to find setting: [" << name << "]";
@@ -127,6 +130,6 @@ public:
   void reportSetting(const string name) const;
 };
 
-
+} //namespace libp
 
 #endif

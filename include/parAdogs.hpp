@@ -31,6 +31,8 @@ SOFTWARE.
 #include "settings.hpp"
 #include "platform.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
   void AddSettings(settings_t& settings);
@@ -43,15 +45,18 @@ namespace paradogs {
                      const  int Nverts,
                      const  int Nfaces,
                      const  int NfaceVertices,
-                     const  int* faceVertices,
-                     hlong*  &EToV,
-                     hlong*  &EToE,
-                     int*    &EToF,
-                     dfloat* &EX,
-                     dfloat* &EY,
-                     dfloat* &EZ,
+                     const  libp::memory<int>& faceVertices,
+                     libp::memory<hlong>& EToV,
+                     libp::memory<hlong>& EToE,
+                     libp::memory<int>& EToF,
+                     libp::memory<dfloat>& EX,
+                     libp::memory<dfloat>& EY,
+                     libp::memory<dfloat>& EZ,
                      MPI_Comm comm);
-}
+
+} //namespace paradogs
+
+} //namespace libp
 
 #endif
 

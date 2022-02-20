@@ -30,6 +30,8 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsMatrix.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 class mgLevel_t {
@@ -118,8 +120,9 @@ public:
   void Solve(dfloat r[], dfloat x[]);
 };
 
+} //namespace paradogs
 
-}
+} //namespace libp
 
 #endif
 

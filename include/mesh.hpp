@@ -29,12 +29,9 @@ SOFTWARE.
 
 #include "core.hpp"
 #include "settings.hpp"
-#include "platform.hpp"
+#include "ogs.hpp"
 
-#define TRIANGLES 3
-#define QUADRILATERALS 4
-#define TETRAHEDRA 6
-#define HEXAHEDRA 12
+namespace libp {
 
 class meshSettings_t: public settings_t {
 public:
@@ -44,66 +41,125 @@ public:
 
 class mesh_t {
 public:
-  platform_t& platform;
-  meshSettings_t& settings;
-
+  platform_t platform;
+  settings_t settings;
   occa::properties props;
 
   MPI_Comm comm;
   int rank, size;
 
+  /*************************/
+  /* Element Data          */
+  /*************************/
   int dim;
   int Nverts, Nfaces, NfaceVertices;
-  int *faceVertices; // list of mesh vertices on each face
-
-  // indices of vertex nodes
-  int *vertexNodes;
-
   int elementType;
 
+  // indices of vertex nodes
+  libp::memory<int> vertexNodes;
+
   hlong Nnodes=0; //global number of element vertices
-  dfloat *EX=nullptr; // coordinates of vertices for each element
-  dfloat *EY=nullptr;
-  dfloat *EZ=nullptr;
+  libp::memory<dfloat> EX; // coordinates of vertices for each element
+  libp::memory<dfloat> EY;
+  libp::memory<dfloat> EZ;
 
   dlong Nelements=0;       //local element count
   hlong NelementsGlobal=0; //global element count
-  hlong *EToV=nullptr; // element-to-vertex connectivity
-  hlong *EToE=nullptr; // element-to-element connectivity
-  int   *EToF=nullptr; // element-to-(local)face connectivity
-  int   *EToB=nullptr; // element-to-boundary condition type
+  libp::memory<hlong> EToV; // element-to-vertex connectivity
+  libp::memory<hlong> EToE; // element-to-element connectivity
+  libp::memory<int>   EToF; // element-to-(local)face connectivity
+  libp::memory<int>   EToP; // element-to-partition/process connectivity
+  libp::memory<int>   EToB; // element-to-boundary condition type
 
-  hlong *elementInfo=nullptr; //type of element
+  libp::memory<hlong> elementInfo; //type of element
+
+  libp::memory<dlong> VmapM;  // list of vertices on each face
+  libp::memory<dlong> VmapP;  // list of vertices that are paired with face vertices
+
+  libp::memory<int> faceVertices; // list of mesh vertices on each face
 
   // boundary faces
   hlong NboundaryFaces=0; // number of boundary faces
-  hlong *boundaryInfo=nullptr; // list of boundary faces (type, vertex-1, vertex-2, vertex-3)
+  libp::memory<hlong> boundaryInfo; // list of boundary faces (type, vertex-1, vertex-2, vertex-3)
 
-  int    plotNverts=0;    // number of vertices for each plot element
-  int    plotNelements=0; // number of "plot elements" per element
-  int    *plotEToV=nullptr;       // triangulation of plot nodes
+  int plotNverts=0;            // number of vertices for each plot element
+  int plotNelements=0;         // number of "plot elements" per element
+  libp::memory<int> plotEToV;  // triangulation of plot nodes
 
-  mesh_t() = delete;
-  mesh_t(platform_t& _platform, meshSettings_t& _settings,
-         MPI_Comm _comm);
+  mesh_t()=default;
+  mesh_t(platform_t& _platform,
+         meshSettings_t& _settings,
+         MPI_Comm _comm) {
+    Setup(_platform, _settings, _comm);
+  }
 
-  virtual ~mesh_t();
+  ~mesh_t() = default;
 
-  // generic mesh setup
-  static mesh_t& Setup(platform_t& _platform, meshSettings_t& _settings,
-                       MPI_Comm _comm);
+  void Setup(platform_t& _platform,
+             meshSettings_t& _settings,
+             MPI_Comm _comm);
+
+private:
+  /*Element types*/
+  static constexpr int TRIANGLES     =3;
+  static constexpr int QUADRILATERALS=4;
+  static constexpr int TETRAHEDRA    =6;
+  static constexpr int HEXAHEDRA     =12;
+
+  /*Set the type of mesh*/
+  void SetElementType(const int eType);
 
   // box mesh
-  virtual void SetupBox() = 0;
+  void SetupBox() {
+    switch (elementType) {
+      case TRIANGLES:
+        SetupBoxTri2D();
+        break;
+      case QUADRILATERALS:
+        SetupBoxQuad2D();
+        break;
+      case TETRAHEDRA:
+        SetupBoxTet3D();
+        break;
+      case HEXAHEDRA:
+        SetupBoxHex3D();
+        break;
+    }
+  }
+  void SetupBoxTri2D();
+  void SetupBoxQuad2D();
+  void SetupBoxTet3D();
+  void SetupBoxHex3D();
 
   // mesh reader
-  virtual void ParallelReader(const char *fileName) = 0;
+  void ParallelReader(const std::string fileName) {
+    switch (elementType) {
+      case TRIANGLES:
+        ParallelReaderTri2D(fileName);
+        break;
+      case QUADRILATERALS:
+        ParallelReaderQuad2D(fileName);
+        break;
+      case TETRAHEDRA:
+        ParallelReaderTet3D(fileName);
+        break;
+      case HEXAHEDRA:
+        ParallelReaderHex3D(fileName);
+        break;
+    }
+  }
+  void ParallelReaderTri2D(const std::string fileName);
+  void ParallelReaderQuad2D(const std::string fileName);
+  void ParallelReaderTet3D(const std::string fileName);
+  void ParallelReaderHex3D(const std::string fileName);
 
   // repartition elements
   void Partition();
 
-  void Plot(const dfloat* q);
+  void Plot(const libp::memory<dfloat>& q);
 };
+
+} //namespace libp
 
 #endif
 

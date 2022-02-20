@@ -30,11 +30,9 @@ SOFTWARE.
 // precision of AMG storage
 #if 0
 #define pfloat float
-#define ogs_pfloat ogs_float
 #else
 #define pfloat double
 #endif
-
 
 //float data type
 #if 0

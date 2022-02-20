@@ -28,20 +28,31 @@ SOFTWARE.
 #define CORE_HPP
 
 #include <mpi.h>
-#include <occa.hpp>
-#include <cstring>
+#include <occa.h>
 #include <string>
-#include <cmath>
+#include <cstring>
 #include <algorithm>
+#include <cmath>
 #include "utils.hpp"
+#include "memory.hpp"
+
+namespace libp {
 
 // find a factorization n = nx*ny such that
 //  nx>=ny are 'close' to one another
-void factor2(const int n, int &nx, int &ny);
+void Factor2(const int n, int &nx, int &ny);
+
+void RankDecomp2(int  size_x, int  size_y,
+                 int &rank_x, int &rank_y,
+                 const int rank);
 
 // find a factorization n = nx*ny*nz such that
 //  nx>=ny>=nz are all 'close' to one another
-void factor3(const int n, int &nx, int &ny, int &nz);
+void Factor3(const int n, int &nx, int &ny, int &nz);
+
+void RankDecomp3(int  size_x, int  size_y, int  size_z,
+                 int &rank_x, int &rank_y, int &rank_z,
+                 const int rank);
 
 void matrixEigenVectors(int N, double *A, double *VR, double *WR, double *WI);
 void matrixEigenVectors(int N, float *A, float *VR, float *WR, float *WI);
@@ -51,5 +62,7 @@ void matrixEigenValues(int N, float *A, float *WR, float *WI);
 
 void matrixInverse(int N, double *A);
 void matrixInverse(int N, float *A);
+
+} //namespace libp
 
 #endif

@@ -30,6 +30,8 @@ SOFTWARE.
 #include "parAdogs.hpp"
 #include "ogs.hpp"
 
+namespace libp {
+
 namespace paradogs {
 
 struct nonZero_t {
@@ -41,7 +43,7 @@ struct nonZero_t {
 
 class parCSR {
 public:
-  platform_t& platform;
+  platform_t platform;
   MPI_Comm comm;
 
   dlong Nrows=0;
@@ -78,7 +80,7 @@ public:
 
   /*communcation info*/
   dlong NlocalCols = 0;
-  ogs::halo_t *halo = nullptr;
+  ogs::halo_t halo;
   hlong *colMap=nullptr;
 
   //rho ~= cond(invD * A)
@@ -91,7 +93,7 @@ public:
   parCSR(dlong _Nrows, dlong _Ncols,
          const dlong NNZ,
          nonZero_t entries[],
-         platform_t &_platform,
+         const platform_t &_platform,
          MPI_Comm comm);
 
   ~parCSR() {Free();}
@@ -120,7 +122,9 @@ public:
                        const int ChebyshevIterations);
 };
 
-}
+} //namespace paradogs
+
+} //namespace libp
 
 #endif
 
