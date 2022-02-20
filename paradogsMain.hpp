@@ -31,13 +31,15 @@ SOFTWARE.
 #include "platform.hpp"
 #include "mesh.hpp"
 
+using namespace libp;
+
 class paradogsSettings_t: public settings_t {
 public:
   paradogsSettings_t(MPI_Comm& _comm);
   void report();
   void parseFromFile(platformSettings_t& platformSettings,
                      meshSettings_t& meshSettings,
-                     const string filename);
+                     const std::string filename);
 };
 
 #endif

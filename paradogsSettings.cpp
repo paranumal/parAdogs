@@ -38,15 +38,15 @@ void paradogsSettings_t::report() {
 
 void paradogsSettings_t::parseFromFile(platformSettings_t& platformSettings,
                                   meshSettings_t& meshSettings,
-                                  const string filename) {
+                                  const std::string filename) {
   //read all settings from file
   settings_t s(comm);
   s.readSettingsFromFile(filename);
 
   for(auto it = s.settings.begin(); it != s.settings.end(); ++it) {
-    setting_t* set = it->second;
-    const string name = set->getName();
-    const string val = set->getVal<string>();
+    setting_t& set = it->second;
+    const std::string name = set.getName();
+    const std::string val = set.getVal<std::string>();
     if (platformSettings.hasSetting(name))
       platformSettings.changeSetting(name, val);
     else if (meshSettings.hasSetting(name))
@@ -54,7 +54,7 @@ void paradogsSettings_t::parseFromFile(platformSettings_t& platformSettings,
     else if (hasSetting(name)) //self
       changeSetting(name, val);
     else  {
-      stringstream ss;
+      std::stringstream ss;
       ss << "Unknown setting: [" << name << "] requested";
       LIBP_ABORT(ss.str());
     }

@@ -32,32 +32,31 @@ int main(int argc, char **argv){
   // start up MPI
   MPI_Init(&argc, &argv);
 
-  MPI_Comm comm = MPI_COMM_WORLD;
+  {
+    MPI_Comm comm = MPI_COMM_WORLD;
 
-  if(argc!=2)
-    LIBP_ABORT(string("Usage: ./paradogsMain setupfile"));
+    if(argc!=2)
+      LIBP_ABORT(std::string("Usage: ./paradogsMain setupfile"));
 
-  //create default settings
-  platformSettings_t platformSettings(comm);
-  meshSettings_t meshSettings(comm);
-  paradogsSettings_t paradogsSettings(comm);
+    //create default settings
+    platformSettings_t platformSettings(comm);
+    meshSettings_t meshSettings(comm);
+    paradogsSettings_t paradogsSettings(comm);
 
-  //load settings from file
-  paradogsSettings.parseFromFile(platformSettings, meshSettings,
-                                 argv[1]);
+    //load settings from file
+    paradogsSettings.parseFromFile(platformSettings, meshSettings,
+                                   argv[1]);
 
-  // set up platform
-  platform_t platform(platformSettings);
+    // set up platform
+    platform_t platform(platformSettings);
 
-  platformSettings.report();
-  meshSettings.report();
-  paradogsSettings.report();
+    platformSettings.report();
+    meshSettings.report();
+    paradogsSettings.report();
 
-  // set up mesh
-  mesh_t& mesh = mesh_t::Setup(platform, meshSettings, comm);
-
-
-  delete &mesh;
+    // set up mesh
+    mesh_t mesh(platform, meshSettings, comm);
+  }
 
   // close down MPI
   MPI_Finalize();
