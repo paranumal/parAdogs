@@ -28,7 +28,6 @@ SOFTWARE.
 #define PARADOGS_MULTIGRID_HPP 1
 
 #include "parAdogs.hpp"
-#include "parAdogs/parAdogsDefines.h"
 #include "parAdogs/parAdogsMatrix.hpp"
 
 namespace paradogs {

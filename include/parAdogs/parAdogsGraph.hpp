@@ -28,7 +28,6 @@ SOFTWARE.
 #define PARADOGS_GRAPH_HPP 1
 
 #include "parAdogs.hpp"
-#include "parAdogs/parAdogsDefines.h"
 #include "parAdogs/parAdogsMatrix.hpp"
 #include "parAdogs/parAdogsMultigrid.hpp"
 
@@ -73,8 +72,9 @@ private:
   int faceVerts[MAX_NFACES*MAX_NFACEVERTS];
 
   /*Multilevel Laplacian (for spectral partitioning)*/
+  static constexpr int MAX_LEVELS=100;
   int Nlevels=0;
-  mgLevel_t L[PARADOGS_MAX_LEVELS];
+  mgLevel_t L[MAX_LEVELS];
   coarseSolver_t coarseSolver;
 
   hlong* colIds=nullptr;

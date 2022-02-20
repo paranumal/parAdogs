@@ -28,7 +28,6 @@ SOFTWARE.
 #define PARADOGS_MATRIX_HPP 1
 
 #include "parAdogs.hpp"
-#include "parAdogs/parAdogsDefines.h"
 #include "ogs.hpp"
 
 namespace paradogs {

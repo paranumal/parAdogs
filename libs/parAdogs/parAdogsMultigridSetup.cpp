@@ -57,8 +57,8 @@ void graph_t::MultigridSetup() {
       break;
     }
 
-    if (Nlevels>=PARADOGS_MAX_LEVELS)
-      LIBP_ABORT("Paradogs: Max levels exceeded in coarse graph creation. Increase PARADOGS_MAX_LEVELS.")
+    if (Nlevels>=MAX_LEVELS)
+      LIBP_ABORT("Paradogs: Max levels exceeded in coarse graph creation. Increase MAX_LEVELS.")
 
     Lf.SetupSmoother();
 

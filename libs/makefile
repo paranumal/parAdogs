@@ -85,6 +85,7 @@ INCLUDES=${LIBP_INCLUDES}
 LIBCORE_DEFINES=-DLIBP_DIR='"${LIBP_DIR}"'
 LIBMESH_DEFINES=-DMESH_DIR='"${LIBMESH_DIR}"'
 LIBOGS_DEFINES=-DLIBP_DIR='"${LIBP_DIR}"'  -DOGS_DIR='"${LIBOGS_DIR}"'
+LIBPARADOGS_DEFINES=
 
 #.cpp compilation flags
 LIB_CXXFLAGS=${LIBP_DEFINES} ${LIBP_MPICXXFLAGS} ${INCLUDES}
@@ -93,13 +94,15 @@ LIB_CXXFLAGS=${LIBP_DEFINES} ${LIBP_MPICXXFLAGS} ${INCLUDES}
 LIB_DEPS=$(wildcard $(LIBP_INCLUDE_DIR)/*.h)  \
 				 $(wildcard ${LIBP_INCLUDE_DIR}/*.hpp)
 
+LIBOGS_DEPS=$(wildcard ${LIBP_INCLUDE_DIR}/ogs/*.hpp) \
+						${LIB_DEPS}
+
+LIBPARADOGS_DEPS=$(wildcard ${LIBP_INCLUDE_DIR}/parAdogs/*.hpp) \
+								 ${LIBOGS_DEPS}
+
 LIBMESH_DEPS=$(wildcard ${LIBP_INCLUDE_DIR}/mesh/*.h)   \
 						 $(wildcard ${LIBP_INCLUDE_DIR}/mesh/*.hpp) \
-						 ${LIB_DEPS}
-
-LIBOGS_DEPS=$(wildcard ${LIBP_INCLUDE_DIR}/ogs/*.h)   \
-						$(wildcard ${LIBP_INCLUDE_DIR}/ogs/*.hpp) \
-						${LIB_DEPS}
+						 ${LIBPARADOGS_DEPS}
 
 LIBCORE_SRC =$(wildcard core/*.cpp)
 LIBMESH_SRC =$(wildcard mesh/*.cpp)
@@ -112,7 +115,7 @@ LIBOGS_OBJS=$(LIBOGS_SRC:.cpp=.o)
 LIBPARADOGS_OBJS=$(LIBPARADOGS_SRC:.cpp=.o)
 
 .PHONY: all core mesh ogs paradogs \
-				clean realclean silentUpdate-core             \
+				clean clean-kernels realclean silentUpdate-core             \
 				silentUpdate-mesh silentUpdate-paradogs
 
 
