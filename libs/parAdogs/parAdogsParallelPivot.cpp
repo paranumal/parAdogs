@@ -41,7 +41,7 @@ namespace libp {
 
 namespace paradogs {
 
-static dfloat Pivot(dfloat A[],
+static dfloat Pivot(libp::memory<dfloat>& A,
                     const dlong left,
                     const dlong right,
                     const hlong k,
@@ -54,10 +54,10 @@ static dfloat Pivot(dfloat A[],
   /*Bail out if we're looking at a tiny window*/
   if (max-min < 1.0E-13) return pivot;
 
-  dfloat* Am = partition(A+left, A+right, [pivot](const dfloat& a){ return a <= pivot; });
+  dfloat* Am = partition(A.ptr()+left, A.ptr()+right, [pivot](const dfloat& a){ return a <= pivot; });
 
   /*Get how many entries are globally <= pivot*/
-  hlong localCnt = Am-A;
+  hlong localCnt = Am-A.ptr();
   hlong globalCnt = localCnt;
   MPI_Allreduce(&localCnt, &globalCnt, 1, MPI_HLONG, MPI_SUM, comm);
 
@@ -72,11 +72,11 @@ static dfloat Pivot(dfloat A[],
 
 /* Given a distributed vector F in comm, find a pivot value,
    such that there are globally k entries of F which are <= pivot. */
-dfloat ParallelPivot(const dlong N, dfloat F[], 
+dfloat ParallelPivot(const dlong N, libp::memory<dfloat>& F,
                      const hlong k, MPI_Comm comm) {
 
   /*Make a copy of input vector*/
-  dfloat *A = new dfloat[N];
+  libp::memory<dfloat> A(N);
   
   #pragma omp parallel for
   for (dlong n=0;n<N;++n) {
@@ -97,8 +97,6 @@ dfloat ParallelPivot(const dlong N, dfloat F[],
 
   /*Find pivot point via binary search*/
   dfloat pivot = Pivot(A, 0, N, k, globalMin, globalMax, comm);
-
-  delete[] A;
 
   return pivot;
 }

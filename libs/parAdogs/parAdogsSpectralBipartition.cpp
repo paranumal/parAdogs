@@ -41,13 +41,13 @@ void graph_t::SpectralBipartition(const dfloat targetFraction[2]) {
   MultigridSetup();
 
   /*Compute Fiedler vector */
-  dfloat *Fiedler = FiedlerVector();
+  libp::memory<dfloat>& Fiedler = FiedlerVector();
 
   /*Use Fiedler vector to bipartion graph*/
   const hlong K = std::ceil(targetFraction[0]*NVertsGlobal);
   const dfloat pivot = ParallelPivot(Nverts, Fiedler, K, comm);
 
-  int* partition = new int[L[0].A->Ncols];
+  libp::memory<int> partition(L[0].A.Ncols);
 
   for (dlong n=0;n<Nverts;++n) {
     if (Fiedler[n]<=pivot) {
@@ -58,15 +58,13 @@ void graph_t::SpectralBipartition(const dfloat targetFraction[2]) {
   }
 
   /*Fill halo region of partition vector*/
-  L[0].A->halo.Exchange(partition, 1, ogs::Int32);
+  L[0].A.halo.Exchange(partition.ptr(), 1, ogs::Int32);
 
   /*Split the graph according to this partitioning*/
   Split(partition);
 
   /*Clear the coarse levels*/
   MultigridDestroy();
-
-  delete[] partition;
 }
 
 } //namespace paradogs

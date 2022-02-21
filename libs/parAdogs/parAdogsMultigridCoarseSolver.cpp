@@ -31,11 +31,11 @@ namespace libp {
 
 namespace paradogs {
 
-void coarseSolver_t::Solve(dfloat rhs[], dfloat x[]) {
+void coarseSolver_t::Solve(libp::memory<dfloat>& rhs, libp::memory<dfloat>& x) {
 
   //gather the global rhs
-  MPI_Allgatherv(rhs, N, MPI_DFLOAT,
-                 grhs, coarseCounts, coarseOffsets, MPI_DFLOAT, comm);
+  MPI_Allgatherv(rhs.ptr(), N, MPI_DFLOAT,
+                 grhs.ptr(), coarseCounts.ptr(), coarseOffsets.ptr(), MPI_DFLOAT, comm);
 
   #pragma omp parallel for
   for (int n=0;n<N;++n) {
@@ -47,22 +47,22 @@ void coarseSolver_t::Solve(dfloat rhs[], dfloat x[]) {
   }
 }
 
-void coarseSolver_t::Setup(parCSR* A, dfloat null[]) {
+void coarseSolver_t::Setup(parCSR& A, libp::memory<dfloat>& null) {
 
-  comm = A->comm;
+  comm = A.comm;
   int size;
   MPI_Comm_size(comm, &size);
 
-  N = static_cast<int>(A->Nrows);
-  Nrows = A->Nrows;
-  Ncols = A->Ncols;
+  N = static_cast<int>(A.Nrows);
+  Nrows = A.Nrows;
+  Ncols = A.Ncols;
 
-  coarseCounts = new int[size];
-  coarseOffsets = new int[size];
+  coarseCounts.malloc(size);
+  coarseOffsets.malloc(size);
 
   //collect partitioning info
   MPI_Allgather(&N, 1, MPI_INT,
-                coarseCounts, 1, MPI_INT, comm);
+                coarseCounts.ptr(), 1, MPI_INT, comm);
 
   coarseTotal=0;
   for (int r=0;r<size;++r) {
@@ -74,14 +74,14 @@ void coarseSolver_t::Setup(parCSR* A, dfloat null[]) {
   }
 
   //gather global null vector
-  dfloat *gnull = new dfloat[coarseTotal];
+  libp::memory<dfloat> gnull(coarseTotal);
 
-  MPI_Allgatherv( null, N, MPI_DFLOAT,
-                 gnull, coarseCounts, coarseOffsets, MPI_DFLOAT,
+  MPI_Allgatherv( null.ptr(), N, MPI_DFLOAT,
+                 gnull.ptr(), coarseCounts.ptr(), coarseOffsets.ptr(), MPI_DFLOAT,
                  comm);
 
   //populate local dense matrix
-  dfloat *localA = new dfloat[N*coarseTotal];
+  libp::memory<dfloat> localA(N*coarseTotal);
 
   /*Fill the matrix with the null boost*/
   #pragma omp parallel for
@@ -90,76 +90,63 @@ void coarseSolver_t::Setup(parCSR* A, dfloat null[]) {
       localA[n*coarseTotal+m] = null[n]*gnull[m];
     }
   }
-  delete[] gnull;
+  gnull.free();
 
   /*Add sparse entries*/
   #pragma omp parallel for
   for (int n=0;n<N;n++) {
-    const int start = static_cast<int>(A->diag.rowStarts[n]);
-    const int end   = static_cast<int>(A->diag.rowStarts[n+1]);
+    const int start = static_cast<int>(A.diag.rowStarts[n]);
+    const int end   = static_cast<int>(A.diag.rowStarts[n+1]);
     for (int m=start;m<end;m++) {
-      const int col = static_cast<int>(A->diag.cols[m] + A->colOffsetL);
-      localA[n*coarseTotal+col] += A->diag.vals[m];
+      const int col = static_cast<int>(A.diag.cols[m] + A.colOffsetL);
+      localA[n*coarseTotal+col] += A.diag.vals[m];
     }
   }
   #pragma omp parallel for
-  for (int n=0;n<A->offd.nzRows;n++) {
-    const int row   = static_cast<int>(A->offd.rows[n]);
-    const int start = static_cast<int>(A->offd.mRowStarts[n]);
-    const int end   = static_cast<int>(A->offd.mRowStarts[n+1]);
+  for (int n=0;n<A.offd.nzRows;n++) {
+    const int row   = static_cast<int>(A.offd.rows[n]);
+    const int start = static_cast<int>(A.offd.mRowStarts[n]);
+    const int end   = static_cast<int>(A.offd.mRowStarts[n+1]);
     for (int m=start;m<end;m++) {
-      const int col = static_cast<int>(A->colMap[A->offd.cols[m]]);
-      localA[row*coarseTotal+col] += A->offd.vals[m];
+      const int col = static_cast<int>(A.colMap[A.offd.cols[m]]);
+      localA[row*coarseTotal+col] += A.offd.vals[m];
     }
   }
 
   //assemble the full matrix
-  dfloat *gA = new dfloat[coarseTotal*coarseTotal];
+  libp::memory<dfloat> gA(coarseTotal*coarseTotal);
 
   for (int r=0;r<size;++r) {
     coarseCounts[r] *= coarseTotal;
     coarseOffsets[r] *= coarseTotal;
   }
 
-  MPI_Allgatherv(localA, N*coarseTotal, MPI_DFLOAT,
-                 gA, coarseCounts, coarseOffsets, MPI_DFLOAT,
+  MPI_Allgatherv(localA.ptr(), N*coarseTotal, MPI_DFLOAT,
+                 gA.ptr(), coarseCounts.ptr(), coarseOffsets.ptr(), MPI_DFLOAT,
                  comm);
 
   MPI_Barrier(comm);
-  delete[] localA;
+  localA.free();
 
   for (int r=0;r<size;++r) {
     coarseCounts[r]  /= coarseTotal;
     coarseOffsets[r] /= coarseTotal;
   }
 
-  matrixInverse(coarseTotal, gA);
+  matrixInverse(coarseTotal, gA.ptr());
 
   //diag piece of invA
-  invA = new dfloat[N*coarseTotal];
+  invA.malloc(N*coarseTotal);
 
   #pragma omp parallel for
   for (int n=0;n<N;n++) {
     for (int m=0;m<coarseTotal;m++) {
-      invA[n*coarseTotal+m] = gA[(n+A->rowOffsetL)*coarseTotal+m];
+      invA[n*coarseTotal+m] = gA[(n+A.rowOffsetL)*coarseTotal+m];
     }
   }
 
-  delete[] gA;
-
   /*Space for global rhs*/
-  grhs = new dfloat[coarseTotal];
-}
-
-void coarseSolver_t::Free() {
-  N=0;
-  Nrows=0;
-  Ncols=0;
-  coarseTotal=0;
-  if(coarseOffsets) {delete[] coarseOffsets; coarseOffsets=nullptr;}
-  if(coarseCounts)  {delete[] coarseCounts; coarseCounts=nullptr;}
-  if(invA)          {delete[] invA; invA=nullptr; }
-  if(grhs)          {delete[] grhs; grhs=nullptr; }
+  grhs.malloc(coarseTotal);
 }
 
 } //namespace paradogs

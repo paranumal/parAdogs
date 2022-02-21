@@ -91,29 +91,29 @@ void graph_t::MultigridSetup() {
 void mgLevel_t::SetupSmoother() {
 
   // estimate rho(invD * A)
-  A->rho = A->rhoDinvA(null);
+  A.rho = A.rhoDinvA(null);
 
   /*Smoothing params*/
-  lambda1 = A->rho;
-  lambda0 = A->rho/10.;
+  lambda1 = A.rho;
+  lambda0 = A.rho/10.;
 
 }
 
 void mgLevel_t::AllocateScratch(const int l) {
 
   /*Space for Fiedler*/
-  Fiedler = new dfloat[Ncols];
+  Fiedler.malloc(Ncols);
 
-  RES = new dfloat[Ncols];
+  RES.malloc(Ncols);
 
   if (l>0) {
     /*Multigrid buffers*/
-    RHS = new dfloat[Nrows];
-    X = new dfloat[Ncols];
+    RHS.malloc(Nrows);
+    X.malloc(Ncols);
   }
 
   /*Scratch space*/
-  scratch = new dfloat[2*Ncols];
+  scratch.malloc(2*Ncols);
 }
 
 
@@ -126,77 +126,65 @@ void mgLevel_t::CoarsenLevel(mgLevel_t& Lf, const dfloat theta) {
 
   /*Create a vertex matching*/
   dlong Nc=0;
-  hlong *FineToCoarse = new hlong[Lf.Ncols];
-  Lf.A->Aggregate(Nc, theta, FineToCoarse);
+  libp::memory<hlong> FineToCoarse(Lf.Ncols);
+  Lf.A.Aggregate(Nc, theta, FineToCoarse);
 
   /* Tentative prolongation operator*/
-  parCSR* T = TentativeProlongator(Nf, Nc,
-                                   Lf.A->platform, Lf.A->comm,
-                                   FineToCoarse,
-                                   Lf.null, &null);
-  delete[] FineToCoarse;
+  parCSR T = TentativeProlongator(Nf, Nc,
+                                  Lf.A.platform, Lf.A.comm,
+                                  FineToCoarse,
+                                  Lf.null, null);
+  FineToCoarse.free();
 
   /* Smoothed prologontion */
   Lf.P = SmoothProlongator(Lf.A, T);
-  delete T;
+  T = parCSR(); //Free T
 
   /* R = P^T*/
   Lf.R = Transpose(Lf.P);
-  Lf.Ncols = std::max(Lf.Ncols, Lf.R->Ncols);
+  Lf.Ncols = std::max(Lf.Ncols, Lf.R.Ncols);
 
   /*Galerkin product*/
-  parCSR* AP = SpMM(Lf.A, Lf.P);
+  parCSR AP = SpMM(Lf.A, Lf.P);
   A = SpMM(Lf.R, AP);
-  delete AP;
-  // A->GalerkinProduct(Lf.A, Lf.P);
+  // A.GalerkinProduct(Lf.A, Lf.P);
+  AP= parCSR(); //Free AP
 
   /*fill diagonal*/
-  A->diagA = new dfloat[A->Ncols];
-  A->diagInv = new dfloat[A->Nrows];
+  A.diagA.malloc(A.Ncols);
+  A.diagInv.malloc(A.Nrows);
 
   #pragma omp parallel for
-  for (dlong i=0;i<A->Nrows;i++) {
-    const dlong start = A->diag.rowStarts[i];
-    const dlong end   = A->diag.rowStarts[i+1];
+  for (dlong i=0;i<A.Nrows;i++) {
+    const dlong start = A.diag.rowStarts[i];
+    const dlong end   = A.diag.rowStarts[i+1];
 
     for (dlong j=start;j<end;j++) {
       //record the diagonal
-      if (A->diag.cols[j]==i) {
-        A->diagA[i] = A->diag.vals[j];
-        A->diagInv[i] = 1.0/A->diagA[i];
+      if (A.diag.cols[j]==i) {
+        A.diagA[i] = A.diag.vals[j];
+        A.diagInv[i] = 1.0/A.diagA[i];
         break;
       }
     }
   }
 
   //fill the halo region
-  A->halo.Exchange(A->diagA, 1, ogs::Dfloat);
+  A.halo.Exchange(A.diagA.ptr(), 1, ogs::Dfloat);
 
-  Nrows = A->Nrows;
-  Ncols = std::max(A->Ncols, Lf.P->Ncols);
+  Nrows = A.Nrows;
+  Ncols = std::max(A.Ncols, Lf.P.Ncols);
 
   Nglobal = static_cast<hlong>(Nrows);
-  MPI_Allreduce(MPI_IN_PLACE, &Nglobal, 1, MPI_HLONG, MPI_SUM, A->comm);
+  MPI_Allreduce(MPI_IN_PLACE, &Nglobal, 1, MPI_HLONG, MPI_SUM, A.comm);
 }
 
 /*Free coarse levels of hierarchy*/
 void graph_t::MultigridDestroy() {
-  if (colIds) {delete[] colIds; colIds=nullptr; }
-  coarseSolver.Free();
-  for (int n=Nlevels-1;n>=0;--n) L[n].Free();
+  colIds.free();
+  coarseSolver = coarseSolver_t();
+  for (int n=Nlevels-1;n>=0;--n) L[n] = mgLevel_t();
   Nlevels=0;
-}
-
-void mgLevel_t::Free() {
-  if (A) {delete A; A=nullptr;}
-  if (P) {delete P; P=nullptr;}
-  if (R) {delete R; R=nullptr;}
-  if (null) {delete[] null; null=nullptr; }
-  if (Fiedler) {delete[] Fiedler; Fiedler=nullptr; }
-  if (X) {delete[] X; X=nullptr; }
-  if (RHS) {delete[] RHS; RHS=nullptr; }
-  if (RES) {delete[] RES; RES=nullptr; }
-  if (scratch) {delete[] scratch; scratch=nullptr; }
 }
 
 } //namespace paradogs

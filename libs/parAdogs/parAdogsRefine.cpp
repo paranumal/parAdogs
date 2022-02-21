@@ -37,12 +37,12 @@ namespace paradogs {
 /****************************************/
 void graph_t::Refine(const int level) {
 
-  parCSR* A = L[level].A;
-  dfloat *null = L[level].null;
+  parCSR& A = L[level].A;
+  libp::memory<dfloat>& null = L[level].null;
   const dlong N = L[level].Nrows;
   const dlong Ncols = L[level].Ncols;
 
-  dfloat *Fiedler = L[level].Fiedler;
+  libp::memory<dfloat>& Fiedler = L[level].Fiedler;
 
   /*******************************************************/
   /*Improve fine Fiedler vector via Inverse Iteration    */
@@ -53,12 +53,12 @@ void graph_t::Refine(const int level) {
 
   const int maxIters=1;
 
-  dfloat *x  = new dfloat[Ncols];
-  dfloat *scratch  = new dfloat[3*Ncols];
-  dfloat *AF = scratch;
+  libp::memory<dfloat> x(Ncols);
+  libp::memory<dfloat> scratch(3*Ncols);
+  libp::memory<dfloat> AF = scratch;
 
   /*AF = A*F*/
-  A->SpMV(1.0, Fiedler, 0.0, AF);
+  A.SpMV(1.0, Fiedler, 0.0, AF);
 
   /*theta = F^T * A * F */
   dfloat theta = 0.0;
@@ -118,7 +118,7 @@ void graph_t::Refine(const int level) {
     }
 
     /*AF = A*F*/
-    A->SpMV(1.0, Fiedler, 0.0, AF);
+    A.SpMV(1.0, Fiedler, 0.0, AF);
 
     /*theta = F^T * A * F */
     theta = 0.0;
@@ -134,9 +134,6 @@ void graph_t::Refine(const int level) {
 
     // if (rank==0)  printf("err = %f, theta = %f, ||AF|| = %f, cg_iter=%d\n", err, theta, sqrt(normAF), cg_iter);
   }
-
-  delete[] scratch;
-  delete[] x;
 }
 
 } //namespace paradogs

@@ -55,11 +55,10 @@ void graph_t::CuthillMckee() {
   /*Create an ordering via Cuthill Mckee*/
   std::queue<dlong> q;
 
-  hlong* newId = new hlong[Nelements]; //TODO halo region here
-  bool* visited = new bool[Nelements];
+  libp::memory<hlong> newId(Nelements); //TODO halo region here
 
   /*mark nodes as unvisted*/
-  for (dlong e=0;e<Nelements;++e) visited[e] = false;
+  libp::memory<bool> visited(Nelements, false);
 
   /*Start with minimal degree element*/
   q.push(minloc);
@@ -146,9 +145,6 @@ void graph_t::CuthillMckee() {
       pe = static_cast<dlong>(newId[e]-gVoffsetL);
     }
   }
-
-  delete[] visited;
-  delete[] newId;
 }
 
 } //namespace paradogs

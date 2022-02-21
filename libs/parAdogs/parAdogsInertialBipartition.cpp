@@ -41,19 +41,17 @@ namespace paradogs {
 /****************************************/
 void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
 
-  int* partition = new int[Nverts];
+  libp::memory<int> partition(Nverts);
 
   double I[9] = {0.0, 0.0, 0.0,
                  0.0, 0.0, 0.0,
                  0.0, 0.0, 0.0};
 
-  dfloat *x=nullptr;
-  dfloat *y=nullptr;
-  dfloat *z=nullptr;
+  libp::memory<dfloat> x, y, z;
 
   if (dim==2) {
-    x = new dfloat[Nverts];
-    y = new dfloat[Nverts];
+    x.malloc(Nverts);
+    y.malloc(Nverts);
 
     /*Compute center of mass of each element*/
     for (dlong e=0;e<Nverts;++e) {
@@ -92,9 +90,9 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
     MPI_Allreduce(MPI_IN_PLACE, I, 4, MPI_DOUBLE, MPI_SUM, comm);
 
   } else {
-    x = new dfloat[Nverts];
-    y = new dfloat[Nverts];
-    z = new dfloat[Nverts];
+    x.malloc(Nverts);
+    y.malloc(Nverts);
+    z.malloc(Nverts);
 
     /*Compute center of mass of each element*/
     for (dlong e=0;e<Nverts;++e) {
@@ -177,23 +175,16 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
   }
 
   /*Use principal axis to bipartion graph*/
-  dfloat *F = new dfloat[Nverts];
+  libp::memory<dfloat> F(Nverts);
 
   if (dim==2) {
     for (dlong e=0;e<Nverts;++e) {
       F[e] = x[e]*a[0] + y[e]*a[1];
     }
-
-    delete[] x;
-    delete[] y;
   } else {
     for (dlong e=0;e<Nverts;++e) {
       F[e] = x[e]*a[0] + y[e]*a[1] + z[e]*a[2];
     }
-
-    delete[] x;
-    delete[] y;
-    delete[] z;
   }
 
   const hlong K = std::ceil(targetFraction[0]*NVertsGlobal);
@@ -207,12 +198,8 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
     }
   }
 
-  delete[] F;
-
   /*Split the graph according to this partitioning*/
   Split(partition);
-
-  delete[] partition;
 }
 
 } //namespace paradogs

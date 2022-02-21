@@ -38,27 +38,27 @@ namespace libp {
 
 namespace paradogs {
 
-parCSR* Transpose(const parCSR* A) {
+parCSR Transpose(const parCSR& A) {
 
   // MPI info
   int rank, size;
-  MPI_Comm_rank(A->comm, &rank);
-  MPI_Comm_size(A->comm, &size);
+  MPI_Comm_rank(A.comm, &rank);
+  MPI_Comm_size(A.comm, &size);
 
   // copy data from nonlocal entries into send buffer
-  nonZero_t *sendNonZeros = new nonZero_t[A->offd.nnz];
-  for(dlong i=0;i<A->offd.nzRows;++i){
-    const hlong row = A->offd.rows[i] + A->rowOffsetL; //global ids
-    for (dlong j=A->offd.mRowStarts[i];j<A->offd.mRowStarts[i+1];j++) {
-      const hlong col =  A->colMap[A->offd.cols[j]]; //global ids
+  libp::memory<nonZero_t> sendNonZeros(A.offd.nnz);
+  for(dlong i=0;i<A.offd.nzRows;++i){
+    const hlong row = A.offd.rows[i] + A.rowOffsetL; //global ids
+    for (dlong j=A.offd.mRowStarts[i];j<A.offd.mRowStarts[i+1];j++) {
+      const hlong col =  A.colMap[A.offd.cols[j]]; //global ids
       sendNonZeros[j].row = col;
       sendNonZeros[j].col = row;
-      sendNonZeros[j].val = A->offd.vals[j];
+      sendNonZeros[j].val = A.offd.vals[j];
     }
   }
 
   //sort by destination row
-  std::sort(sendNonZeros, sendNonZeros+A->offd.nnz,
+  std::sort(sendNonZeros.ptr(), sendNonZeros.ptr()+A.offd.nnz,
             [](const nonZero_t& a, const nonZero_t& b) {
               if (a.row < b.row) return true;
               if (a.row > b.row) return false;
@@ -67,30 +67,26 @@ parCSR* Transpose(const parCSR* A) {
             });
 
   // //count number of non-zeros we're sending
-  int *sendCounts  = new int[size];
-  int *recvCounts  = new int[size];
-  int *sendOffsets = new int[size+1];
-  int *recvOffsets = new int[size+1];
+  libp::memory<int> sendCounts(size, 0);
+  libp::memory<int> recvCounts(size);
+  libp::memory<int> sendOffsets(size+1);
+  libp::memory<int> recvOffsets(size+1);
 
-  hlong *globalColStarts = new hlong[size+1];
+  libp::memory<hlong> globalColStarts(size+1);
   globalColStarts[0]=0;
-  MPI_Allgather(&(A->colOffsetU), 1, MPI_HLONG,
-                 globalColStarts+1, 1, MPI_HLONG, A->comm);
-
-  for (int r=0;r<size;++r) {
-    sendCounts[r]=0;
-  }
+  MPI_Allgather(&(A.colOffsetU), 1, MPI_HLONG,
+                 globalColStarts.ptr()+1, 1, MPI_HLONG, A.comm);
 
   int r=0;
-  for (dlong n=0;n<A->offd.nnz;n++) {
+  for (dlong n=0;n<A.offd.nnz;n++) {
     dlong row = sendNonZeros[n].row;
     while(row>=globalColStarts[r+1]) r++;
     sendCounts[r]++;
   }
-  delete[] globalColStarts;
+  globalColStarts.free();
 
-  MPI_Alltoall(sendCounts, 1, MPI_INT,
-               recvCounts, 1, MPI_INT, A->comm);
+  MPI_Alltoall(sendCounts.ptr(), 1, MPI_INT,
+               recvCounts.ptr(), 1, MPI_INT, A.comm);
 
   sendOffsets[0]=0;
   recvOffsets[0]=0;
@@ -100,7 +96,7 @@ parCSR* Transpose(const parCSR* A) {
   }
   dlong offdnnz = recvOffsets[size]; //total offd nonzeros
 
-  nonZero_t *offdNonZeros = new nonZero_t[offdnnz];
+  libp::memory<nonZero_t> offdNonZeros(offdnnz);
 
   // Make the MPI_NONZERO_T data type
   MPI_Datatype MPI_NONZERO_T;
@@ -117,96 +113,84 @@ parCSR* Transpose(const parCSR* A) {
   MPI_Type_commit (&MPI_NONZERO_T);
 
   // receive non-local nonzeros
-  MPI_Alltoallv(sendNonZeros, sendCounts, sendOffsets, MPI_NONZERO_T,
-                offdNonZeros, recvCounts, recvOffsets, MPI_NONZERO_T,
-                A->comm);
+  MPI_Alltoallv(sendNonZeros.ptr(), sendCounts.ptr(), sendOffsets.ptr(), MPI_NONZERO_T,
+                offdNonZeros.ptr(), recvCounts.ptr(), recvOffsets.ptr(), MPI_NONZERO_T,
+                A.comm);
 
   //clean up
-  MPI_Barrier(A->comm);
+  MPI_Barrier(A.comm);
   MPI_Type_free(&MPI_NONZERO_T);
-  delete[] sendNonZeros;
-  delete[] sendCounts;
-  delete[] recvCounts;
-  delete[] sendOffsets;
-  delete[] recvOffsets;
+  sendNonZeros.free();
+  sendCounts.free();
+  recvCounts.free();
+  sendOffsets.free();
+  recvOffsets.free();
 
-  dlong NNZ = A->diag.nnz+offdnnz;
+  dlong NNZ = A.diag.nnz+offdnnz;
 
-  nonZero_t *entries = new nonZero_t[NNZ];
+  libp::memory<nonZero_t> entries(NNZ);
 
-  dlong *rowStarts = new dlong[A->NlocalCols+1];
-  dlong *rowCounts = new dlong[A->NlocalCols];
-  #pragma omp parallel for
-  for(dlong i=0; i<A->NlocalCols+1; i++) rowStarts[i]=0;
-
-  #pragma omp parallel for
-  for(dlong i=0; i<A->NlocalCols; i++) rowCounts[i]=0;
+  libp::memory<dlong> rowStarts(A.NlocalCols+1, 0);
+  libp::memory<dlong> rowCounts(A.NlocalCols, 0);
 
   /*Count entries per row*/
-  for(dlong i=0; i<A->Nrows; i++) {
-    const dlong Jstart = A->diag.rowStarts[i];
-    const dlong Jend   = A->diag.rowStarts[i+1];
+  for(dlong i=0; i<A.Nrows; i++) {
+    const dlong Jstart = A.diag.rowStarts[i];
+    const dlong Jend   = A.diag.rowStarts[i+1];
 
     for(dlong jj=Jstart; jj<Jend; jj++){
-      rowStarts[A->diag.cols[jj]+1]++;
+      rowStarts[A.diag.cols[jj]+1]++;
     }
   }
   for(dlong i=0; i<offdnnz; i++) {
-    const dlong row = static_cast<dlong>(offdNonZeros[i].row-A->colOffsetL);
+    const dlong row = static_cast<dlong>(offdNonZeros[i].row-A.colOffsetL);
     rowStarts[row+1]++;
   }
 
   /*Cumulative sum*/
-  for(dlong i=1; i<A->NlocalCols+1; i++) {
+  for(dlong i=1; i<A.NlocalCols+1; i++) {
     rowStarts[i] += rowStarts[i-1];
   }
 
   //fill local nonzeros
   // #pragma omp parallel for
-  for(dlong i=0; i<A->Nrows; i++){
-    const dlong Jstart = A->diag.rowStarts[i];
-    const dlong Jend   = A->diag.rowStarts[i+1];
+  for(dlong i=0; i<A.Nrows; i++){
+    const dlong Jstart = A.diag.rowStarts[i];
+    const dlong Jend   = A.diag.rowStarts[i+1];
 
     for(dlong jj=Jstart; jj<Jend; jj++){
-      const dlong row = A->diag.cols[jj];
+      const dlong row = A.diag.cols[jj];
       const dlong c = rowStarts[row] + rowCounts[row];
 
-      entries[c].row = row + A->colOffsetL;
-      entries[c].col = i + A->rowOffsetL;
-      entries[c].val = A->diag.vals[jj];
+      entries[c].row = row + A.colOffsetL;
+      entries[c].col = i + A.rowOffsetL;
+      entries[c].val = A.diag.vals[jj];
       rowCounts[row]++;
     }
   }
   for(dlong i=0; i<offdnnz; i++) {
-    const dlong row = static_cast<dlong>(offdNonZeros[i].row-A->colOffsetL);
+    const dlong row = static_cast<dlong>(offdNonZeros[i].row-A.colOffsetL);
     const dlong c = rowStarts[row] + rowCounts[row];
     entries[c] = offdNonZeros[i];
     rowCounts[row]++;
   }
 
-  delete[] offdNonZeros;
+  offdNonZeros.free();
 
   //sort each row by column id
   #pragma omp parallel for
-  for(dlong i=0; i<A->NlocalCols; i++){
+  for(dlong i=0; i<A.NlocalCols; i++){
     const dlong Nentries = rowStarts[i+1]-rowStarts[i];
     const dlong c = rowStarts[i];
-    std::sort(entries+c, entries+c+Nentries,
+    std::sort(entries.ptr()+c, entries.ptr()+c+Nentries,
           [](const nonZero_t& a, const nonZero_t& b) {
             return a.col < b.col;
           });
   }
 
-  delete[] rowStarts;
-  delete[] rowCounts;
-
-  parCSR* AT = new parCSR(A->NlocalCols, A->Nrows,
-                          NNZ, entries,
-                          A->platform, A->comm);
-
-  delete[] entries;
-
-  return AT;
+  return parCSR(A.NlocalCols, A.Nrows,
+                NNZ, entries,
+                A.platform, A.comm);
 }
 
 } //namespace paradogs

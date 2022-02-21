@@ -38,13 +38,13 @@ extern std::mt19937 RNG;
 /*Create a vertex matching using distance-2 aggregation*/
 void parCSR::Aggregate(dlong& Nc,
                        const dfloat theta,
-                       hlong FineToCoarse[]) {
+                       libp::memory<hlong>& FineToCoarse) {
 
   /*Create rng*/
   std::uniform_real_distribution<> distrib(-0.25, 0.25);
 
   parCSR strong(Nrows, Ncols, platform, comm);
-  strong.diag.rowStarts = new dlong[Nrows+1];
+  strong.diag.rowStarts.malloc(Nrows+1);
 
   #pragma omp parallel for
   for(dlong i=0; i<Nrows+1; i++) {
@@ -88,8 +88,8 @@ void parCSR::Aggregate(dlong& Nc,
     strong.diag.rowStarts[i] += strong.diag.rowStarts[i-1];
   }
   strong.diag.nnz = strong.diag.rowStarts[Nrows];
-  strong.diag.cols = new dlong[strong.diag.nnz];
-  strong.diag.vals = new dfloat[strong.diag.nnz];
+  strong.diag.cols.malloc(strong.diag.nnz);
+  strong.diag.vals.malloc(strong.diag.nnz);
 
   // fill in the columns for strong connections
   // #pragma omp parallel for
@@ -127,18 +127,16 @@ void parCSR::Aggregate(dlong& Nc,
     }
   }
 
-  int   *state = new int[Ncols];
-  float *rand  = new float[Ncols];
-  int   *Ts = new int[Ncols];
-  float *Tr = new float[Ncols];
-  hlong *Tn = new hlong[Ncols];
+  libp::memory<float> rand(Ncols);
+  libp::memory<int>   Ts(Ncols);
+  libp::memory<float> Tr(Ncols);
+  libp::memory<hlong> Tn(Ncols);
 
   /*Initialize state array*/
   /*  0 - Undecided */
   /* -1 - Not MIS */
   /*  1 - MIS */
-  #pragma omp parallel for
-  for (dlong n=0;n<Ncols;++n) state[n] = 0;
+  libp::memory<int>   state(Ncols, 0);
 
   /*Use vertex degree with random noise to break ties*/
   // #pragma omp parallel for
@@ -149,7 +147,7 @@ void parCSR::Aggregate(dlong& Nc,
   }
 
   //fill halo region
-  halo.Exchange(rand, 1, ogs::Float);
+  halo.Exchange(rand.ptr(), 1, ogs::Float);
 
   do {
     // first neighbours
@@ -181,9 +179,9 @@ void parCSR::Aggregate(dlong& Nc,
     }
 
     //share results
-    halo.Exchange(Ts, 1, ogs::Int32);
-    halo.Exchange(Tr, 1, ogs::Float);
-    halo.Exchange(Tn, 1, ogs::Hlong);
+    halo.Exchange(Ts.ptr(), 1, ogs::Int32);
+    halo.Exchange(Tr.ptr(), 1, ogs::Float);
+    halo.Exchange(Tn.ptr(), 1, ogs::Hlong);
 
     // second neighbours
     #pragma omp parallel for
@@ -217,7 +215,7 @@ void parCSR::Aggregate(dlong& Nc,
     }
 
     //share results
-    halo.Exchange(state, 1, ogs::Int32);
+    halo.Exchange(state.ptr(), 1, ogs::Int32);
 
     // if number of undecided nodes = 0, algorithm terminates
     hlong cnt = 0;
@@ -228,9 +226,9 @@ void parCSR::Aggregate(dlong& Nc,
 
   } while(true);
 
-  delete[] rand;
-  delete[] Tr;
-  delete[] Tn;
+  rand.free();
+  Tr.free();
+  Tn.free();
 
 
   // count the coarse nodes/aggregates
@@ -257,8 +255,8 @@ void parCSR::Aggregate(dlong& Nc,
   }
 
   //share the initial aggregate flags
-  halo.Exchange(Ts, 1, ogs::Int32);
-  halo.Exchange(FineToCoarse, 1, ogs::Hlong);
+  halo.Exchange(Ts.ptr(), 1, ogs::Int32);
+  halo.Exchange(FineToCoarse.ptr(), 1, ogs::Hlong);
 
   // first neighbours
   #pragma omp parallel for
@@ -278,8 +276,8 @@ void parCSR::Aggregate(dlong& Nc,
     }
   }
 
-  halo.Exchange(Ts, 1, ogs::Int32);
-  halo.Exchange(FineToCoarse, 1, ogs::Hlong);
+  halo.Exchange(Ts.ptr(), 1, ogs::Int32);
+  halo.Exchange(FineToCoarse.ptr(), 1, ogs::Hlong);
 
   // second neighbours
   #pragma omp parallel for
@@ -309,10 +307,7 @@ void parCSR::Aggregate(dlong& Nc,
   }
 
   //share results
-  halo.Exchange(FineToCoarse, 1, ogs::Hlong);
-
-  delete[] Ts;
-  delete[] state;
+  halo.Exchange(FineToCoarse.ptr(), 1, ogs::Hlong);
 }
 
 } //namespace paradogs

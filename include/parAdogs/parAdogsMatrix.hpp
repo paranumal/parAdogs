@@ -56,9 +56,9 @@ public:
   //local sparse matrix
   struct CSR {
     dlong nnz=0;
-    dlong  *rowStarts=nullptr;
-    dlong  *cols=nullptr;
-    pfloat *vals=nullptr;
+    libp::memory<dlong>  rowStarts;
+    libp::memory<dlong>  cols;
+    libp::memory<pfloat> vals;
   };
   CSR diag;
 
@@ -67,58 +67,56 @@ public:
     dlong nnz=0;
     dlong nzRows=0;
 
-    dlong  *rowStarts=nullptr;
-    dlong  *mRowStarts=nullptr; //compressed version of rowStarts
-    dlong  *rows=nullptr;
-    dlong  *cols=nullptr;
-    pfloat *vals=nullptr;
+    libp::memory<dlong>  rowStarts;
+    libp::memory<dlong>  mRowStarts;
+    libp::memory<dlong>  rows;
+    libp::memory<dlong>  cols;
+    libp::memory<pfloat> vals;
   };
   MCSR offd;
 
-  dfloat *diagA=nullptr;
-  dfloat *diagInv=nullptr;
+  libp::memory<dfloat> diagA;
+  libp::memory<dfloat> diagInv;
 
   /*communcation info*/
   dlong NlocalCols = 0;
   ogs::halo_t halo;
-  hlong *colMap=nullptr;
+  libp::memory<hlong> colMap;
 
   //rho ~= cond(invD * A)
   dfloat rho=0.0;
 
+  parCSR()=default;
   parCSR(dlong N, dlong M, platform_t& _platform, MPI_Comm _comm):
     platform(_platform), comm(_comm), Nrows(N), Ncols(M) {}
 
   //build a parCSR matrix from a distributed COO matrix
   parCSR(dlong _Nrows, dlong _Ncols,
          const dlong NNZ,
-         nonZero_t entries[],
+         libp::memory<nonZero_t>& entries,
          const platform_t &_platform,
          MPI_Comm comm);
 
-  ~parCSR() {Free();}
-  void Free();
-
-  void haloSetup(hlong *colIds);
+  void haloSetup(libp::memory<hlong>& colIds);
 
   // estimate rho(invD * A)
-  dfloat rhoDinvA(dfloat null[]);
+  dfloat rhoDinvA(libp::memory<dfloat>& null);
 
   /*Aggregate via distance-2 PMIS*/
   void Aggregate(dlong& cNverts,
                  const dfloat theta,
-                 hlong FineToCoarse[]);
+                 libp::memory<hlong>& FineToCoarse);
 
   void GalerkinProduct(const parCSR &A, const parCSR &P);
 
-  void SpMV(const dfloat alpha, dfloat x[],
-            const dfloat beta, dfloat y[]);
-  void SpMV(const dfloat alpha, dfloat x[],
-            const dfloat beta, const dfloat y[], dfloat z[]);
+  void SpMV(const dfloat alpha, libp::memory<dfloat>& x,
+            const dfloat beta, libp::memory<dfloat>& y);
+  void SpMV(const dfloat alpha, libp::memory<dfloat>& x,
+            const dfloat beta, const libp::memory<dfloat>& y, libp::memory<dfloat>& z);
 
-  void SmoothChebyshev(dfloat b[], dfloat x[],
+  void SmoothChebyshev(libp::memory<dfloat>& b, libp::memory<dfloat>& x,
                        const dfloat lambda0, const dfloat lambda1,
-                       const bool xIsZero, dfloat scratch[],
+                       const bool xIsZero, libp::memory<dfloat>& scratch,
                        const int ChebyshevIterations);
 };
 

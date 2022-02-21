@@ -71,7 +71,8 @@ private:
 
     hlong E[MAX_NFACES];   //Global element ids of neighbors
     int F[MAX_NFACES];     //Face ids of neighbors
-  } *elements=nullptr;
+  };
+  libp::memory<element_t> elements;
 
   int faceVerts[MAX_NFACES*MAX_NFACEVERTS];
 
@@ -81,7 +82,7 @@ private:
   mgLevel_t L[MAX_LEVELS];
   coarseSolver_t coarseSolver;
 
-  hlong* colIds=nullptr;
+  libp::memory<hlong> colIds;
 
 public:
   /*Build a graph from mesh connectivity info*/
@@ -124,12 +125,12 @@ private:
 
 
   /*Divide graph into two pieces according to a bisection*/
-  void Split(const int partition[]);
+  void Split(const libp::memory<int>& partition);
 
   void CreateLaplacian();
 
   /*Compute Fiedler vector of graph */
-  dfloat* FiedlerVector();
+  libp::memory<dfloat>& FiedlerVector();
 
   /*Improve a Fiedler vector*/
   void Refine(const int level);
@@ -137,16 +138,16 @@ private:
   /* Solve A_{l}*x = b*/
   int Solve(const int level,
             const dfloat TOL,
-            dfloat r[],
-            dfloat x[],
-            dfloat scratch[]);
+            libp::memory<dfloat>& r,
+            libp::memory<dfloat>& x,
+            libp::memory<dfloat>& scratch);
 
   /*Create multilevel heirarchy*/
   void MultigridSetup();
 
   void MultigridVcycle(const int l,
-                      dfloat r[],
-                      dfloat x[]);
+                       libp::memory<dfloat>& r,
+                       libp::memory<dfloat>& x);
 
   /*Clear multilevel heirarchy*/
   void MultigridDestroy();

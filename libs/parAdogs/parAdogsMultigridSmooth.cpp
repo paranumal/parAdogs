@@ -32,9 +32,9 @@ namespace libp {
 
 namespace paradogs {
 
-void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
+void parCSR::SmoothChebyshev(libp::memory<dfloat>& b, libp::memory<dfloat>& x,
                              const dfloat lambda0, const dfloat lambda1,
-                             const bool xIsZero, dfloat scratch[],
+                             const bool xIsZero, libp::memory<dfloat>& scratch,
                              const int ChebyshevIterations) {
 
   const dfloat theta = 0.5*(lambda1+lambda0);
@@ -44,8 +44,8 @@ void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
   dfloat rho_n = 1./sigma;
   dfloat rho_np1;
 
-  dfloat *d = scratch + 0*Ncols;
-  dfloat *r = scratch + 1*Ncols;
+  libp::memory<dfloat> d = scratch + 0*Ncols;
+  libp::memory<dfloat> r = scratch + 1*Ncols;
 
   if(xIsZero){ //skip the Ax if x is zero
     // r = D^{-1}b
@@ -75,7 +75,7 @@ void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
       r[n] = diagInv[n]*rn;
     }
 
-    halo.Exchange(x, 1, ogs::Dfloat);
+    halo.Exchange(x.ptr(), 1, ogs::Dfloat);
 
     #pragma omp parallel for
     for(dlong n=0; n<offd.nzRows; n++){ //local
@@ -127,7 +127,7 @@ void parCSR::SmoothChebyshev(dfloat b[], dfloat x[],
       r[n] += diagInv[n]*rn;
     }
 
-    halo.Exchange(d, 1, ogs::Dfloat);
+    halo.Exchange(d.ptr(), 1, ogs::Dfloat);
 
     #pragma omp parallel for
     for(dlong n=0; n<offd.nzRows; n++){ //local

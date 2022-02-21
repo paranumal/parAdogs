@@ -39,30 +39,26 @@ public:
   dlong Nrows=0, Ncols=0;
   hlong Nglobal=0;
 
-  // parCSR A, P, R;
-  parCSR *A=nullptr, *R=nullptr, *P=nullptr;
+  parCSR A, P, R;
 
   /*null vector*/
-  dfloat *null=nullptr;
+  libp::memory<dfloat> null;
 
   /*Fiedler vector*/
-  dfloat *Fiedler=nullptr;
+  libp::memory<dfloat> Fiedler;
 
   /*Vcycle storage*/
-  dfloat *RHS=nullptr;
-  dfloat *X=nullptr;
-  dfloat *RES=nullptr;
-  dfloat *scratch=nullptr;
+  libp::memory<dfloat> RHS;
+  libp::memory<dfloat> X;
+  libp::memory<dfloat> RES;
+  libp::memory<dfloat> scratch;
 
   dfloat lambda1, lambda0; //smoothing params
-
-  ~mgLevel_t() {Free();}
-  void Free();
 
   /*Create graph Laplacian*/
   void CreateLaplacian(const dlong Nelements,
                        const int Nfaces,
-                       const hlong EToE[],
+                       const libp::memory<hlong>& EToE,
                        MPI_Comm comm);
 
   /*Construct a coarse level*/
@@ -76,26 +72,26 @@ public:
   void FiedlerVector();
 
   /*Multigrid functions*/
-  void Smooth(dfloat r[], dfloat x[], const bool xIsZero);
-  void Residual(dfloat r[], dfloat x[], dfloat res[]);
-  void Coarsen(dfloat x[], dfloat xC[]);
-  void Prolongate(dfloat xC[], dfloat x[]);
+  void Smooth(libp::memory<dfloat>& r, libp::memory<dfloat>& x, const bool xIsZero);
+  void Residual(libp::memory<dfloat>& r, libp::memory<dfloat>& x, libp::memory<dfloat>& res);
+  void Coarsen(libp::memory<dfloat>& x, libp::memory<dfloat>& xC);
+  void Prolongate(libp::memory<dfloat>& xC, libp::memory<dfloat>& x);
 };
 
-parCSR* TentativeProlongator(const dlong Nf,
-                             const dlong Nc,
-                             platform_t& platform,
-                             MPI_Comm comm,
-                             hlong FineToCoarse[],
-                             dfloat FineNull[],
-                             dfloat *CoarseNull[]);
+parCSR TentativeProlongator(const dlong Nf,
+                            const dlong Nc,
+                            platform_t& platform,
+                            MPI_Comm comm,
+                            libp::memory<hlong>& FineToCoarse,
+                            libp::memory<dfloat>& FineNull,
+                            libp::memory<dfloat>& CoarseNull);
 
-parCSR* SmoothProlongator(const parCSR* A,
-                          const parCSR* T);
+parCSR SmoothProlongator(const parCSR& A,
+                         const parCSR& T);
 
-parCSR* Transpose(const parCSR* A);
+parCSR Transpose(const parCSR& A);
 
-parCSR* SpMM(const parCSR* A, const parCSR* B);
+parCSR SpMM(const parCSR& A, const parCSR& B);
 
 class coarseSolver_t {
 
@@ -107,17 +103,14 @@ public:
   int Ncols=0;
 
   int coarseTotal=0;
-  int *coarseCounts=nullptr;
-  int *coarseOffsets=nullptr;
+  libp::memory<int> coarseCounts;
+  libp::memory<int> coarseOffsets;
 
-  dfloat *invA=nullptr;
-  dfloat *grhs=nullptr;
+  libp::memory<dfloat> invA;
+  libp::memory<dfloat> grhs;
 
-  ~coarseSolver_t() {Free();}
-  void Free();
-
-  void Setup(parCSR* A, dfloat null[]);
-  void Solve(dfloat r[], dfloat x[]);
+  void Setup(parCSR& A, libp::memory<dfloat>& null);
+  void Solve(libp::memory<dfloat>& r, libp::memory<dfloat>& x);
 };
 
 } //namespace paradogs

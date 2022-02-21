@@ -51,7 +51,7 @@ void graph_t::Connect(){
   gVoffsetL = gVoffsetU-Nverts;
 
   /* build list of faces */
-  parallelFace_t *faces = new parallelFace_t[Nelements*Nfaces];
+  libp::memory<parallelFace_t> faces(Nelements*Nfaces);
 
   for(dlong e=0;e<Nelements;++e){
     for(int f=0;f<Nfaces;++f){
@@ -74,7 +74,7 @@ void graph_t::Connect(){
   }
 
   /* sort faces by their vertex number pairs */
-  std::sort(faces, faces+Nelements*Nfaces,
+  std::sort(faces.ptr(), faces.ptr()+Nelements*Nfaces,
             [&](const parallelFace_t& a, const parallelFace_t& b) {
               return std::lexicographical_compare(a.v, a.v+NfaceVerts,
                                                   b.v, b.v+NfaceVerts);
@@ -96,7 +96,7 @@ void graph_t::Connect(){
   }
 
   /* resort faces back to the original element/face ordering */
-  std::sort(faces, faces+Nelements*Nfaces,
+  std::sort(faces.ptr(), faces.ptr()+Nelements*Nfaces,
             [](const parallelFace_t& a, const parallelFace_t& b) {
               if(a.element < b.element) return true;
               if(a.element > b.element) return false;
@@ -108,14 +108,10 @@ void graph_t::Connect(){
 
   // count # of elements to send to each rank based on
   // minimum {vertex id % gsize}
-  int *Nsend = new int[gsize];
-  int *Nrecv = new int[gsize];
-  int *sendOffsets = new int[gsize];
-  int *recvOffsets = new int[gsize];
-
-  for (int r=0;r<gsize;++r) {
-    Nsend[r]=0;
-  }
+  libp::memory<int> Nsend(gsize, 0);
+  libp::memory<int> Nrecv(gsize);
+  libp::memory<int> sendOffsets(gsize);
+  libp::memory<int> recvOffsets(gsize);
 
   int allNsend=0;
   for(dlong e=0;e<Nelements;++e){
@@ -148,7 +144,7 @@ void graph_t::Connect(){
     Nsend[rr] = 0;
 
   // buffer for outgoing data
-  parallelFace_t *sendFaces = new parallelFace_t[allNsend];
+  libp::memory<parallelFace_t> sendFaces(allNsend);
 
   // Make the MPI_PARALLELFACE_T data type
   MPI_Datatype MPI_PARALLELFACE_T;
@@ -189,11 +185,11 @@ void graph_t::Connect(){
     }
   }
 
-  delete[] faces;
+  faces.free();
 
   // exchange byte counts
-  MPI_Alltoall(Nsend, 1, MPI_INT,
-               Nrecv, 1, MPI_INT,
+  MPI_Alltoall(Nsend.ptr(), 1, MPI_INT,
+               Nrecv.ptr(), 1, MPI_INT,
                gcomm);
 
   // count incoming faces
@@ -207,15 +203,15 @@ void graph_t::Connect(){
     recvOffsets[rr] = recvOffsets[rr-1] + Nrecv[rr-1]; // byte offsets
 
   // buffer for incoming face data
-  parallelFace_t *recvFaces = new parallelFace_t[allNrecv];
+  libp::memory<parallelFace_t> recvFaces(allNrecv);
 
   // exchange parallel faces
-  MPI_Alltoallv(sendFaces, Nsend, sendOffsets, MPI_PARALLELFACE_T,
-                recvFaces, Nrecv, recvOffsets, MPI_PARALLELFACE_T,
+  MPI_Alltoallv(sendFaces.ptr(), Nsend.ptr(), sendOffsets.ptr(), MPI_PARALLELFACE_T,
+                recvFaces.ptr(), Nrecv.ptr(), recvOffsets.ptr(), MPI_PARALLELFACE_T,
                 gcomm);
 
   // local sort allNrecv received faces
-  std::sort(recvFaces, recvFaces+allNrecv,
+  std::sort(recvFaces.ptr(), recvFaces.ptr()+allNrecv,
             [&](const parallelFace_t& a, const parallelFace_t& b) {
               return std::lexicographical_compare(a.v, a.v+NfaceVerts,
                                                   b.v, b.v+NfaceVerts);
@@ -236,7 +232,7 @@ void graph_t::Connect(){
   }
 
   // sort back to original ordering
-  std::sort(recvFaces, recvFaces+allNrecv,
+  std::sort(recvFaces.ptr(), recvFaces.ptr()+allNrecv,
             [](const parallelFace_t& a, const parallelFace_t& b) {
               if(a.rank < b.rank) return true;
               if(a.rank > b.rank) return false;
@@ -248,8 +244,8 @@ void graph_t::Connect(){
             });
 
   // send faces back from whence they came
-  MPI_Alltoallv(recvFaces, Nrecv, recvOffsets, MPI_PARALLELFACE_T,
-                sendFaces, Nsend, sendOffsets, MPI_PARALLELFACE_T,
+  MPI_Alltoallv(recvFaces.ptr(), Nrecv.ptr(), recvOffsets.ptr(), MPI_PARALLELFACE_T,
+                sendFaces.ptr(), Nsend.ptr(), sendOffsets.ptr(), MPI_PARALLELFACE_T,
                 gcomm);
 
   // extract connectivity info
@@ -267,12 +263,6 @@ void graph_t::Connect(){
 
   MPI_Barrier(gcomm);
   MPI_Type_free(&MPI_PARALLELFACE_T);
-  delete[] sendFaces;
-  delete[] recvFaces;
-  delete[] Nsend;
-  delete[] Nrecv;
-  delete[] sendOffsets;
-  delete[] recvOffsets;
 }
 
 } //namespace paradogs

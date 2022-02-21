@@ -34,7 +34,7 @@ namespace libp {
 
 namespace paradogs {
 
-dfloat ParallelPivot(const dlong N, dfloat F[],
+dfloat ParallelPivot(const dlong N, libp::memory<dfloat>& F,
                      const hlong k, MPI_Comm comm);
 
 } //namespace paradogs

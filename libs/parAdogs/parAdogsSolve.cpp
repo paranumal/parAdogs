@@ -37,17 +37,17 @@ namespace paradogs {
 /****************************************/
 int graph_t::Solve(const int level, 
                    const dfloat TOL,
-                   dfloat r[],
-                   dfloat x[], 
-                   dfloat scratch[]) {
+                   libp::memory<dfloat>& r,
+                   libp::memory<dfloat>& x,
+                   libp::memory<dfloat>& scratch) {
 
-  parCSR* A = L[level].A;
-  const dlong N = A->Nrows;
+  parCSR& A = L[level].A;
+  const dlong N = A.Nrows;
   const dlong Ncols = L[level].Ncols;
 
-  dfloat *p  = scratch + 0*Ncols;
-  dfloat *Ap = scratch + 1*Ncols;
-  dfloat *z  = scratch + 2*Ncols;
+  libp::memory<dfloat> p  = scratch + 0*Ncols;
+  libp::memory<dfloat> Ap = scratch + 1*Ncols;
+  libp::memory<dfloat> z  = scratch + 2*Ncols;
 
   // register scalars
   dfloat rdotz1 = 0.0;
@@ -96,7 +96,7 @@ int graph_t::Solve(const int level,
     }
 
     // A*p
-    A->SpMV(1.0, p, 0.0, Ap);
+    A.SpMV(1.0, p, 0.0, Ap);
 
     // p.Ap
     pAp = 0.0;

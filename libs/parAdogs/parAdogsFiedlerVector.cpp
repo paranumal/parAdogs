@@ -37,7 +37,7 @@ namespace libp {
 namespace paradogs {
 
 /*Compute Fiedler vector of graph via multilevel heirarchy*/
-dfloat* graph_t::FiedlerVector() {
+libp::memory<dfloat>& graph_t::FiedlerVector() {
 
   /*Fiedler vector on coarsest level*/
   L[Nlevels-1].FiedlerVector();
@@ -45,7 +45,7 @@ dfloat* graph_t::FiedlerVector() {
   /*Project and improve the Fiedler vector to the fine level*/
   for (int l=Nlevels-2;l>=0;--l) {
     /*Prolongate Fiedler vector to fine graph*/
-    L[l].P->SpMV(1.0, L[l+1].Fiedler, 0.0, L[l].Fiedler);
+    L[l].P.SpMV(1.0, L[l+1].Fiedler, 0.0, L[l].Fiedler);
 
     /*Refine the Fiedler vector*/
     Refine(l);
@@ -59,16 +59,16 @@ dfloat* graph_t::FiedlerVector() {
 /*Compute Fiedler vector of graph Laplacian*/
 void mgLevel_t::FiedlerVector() {
 
-  const int N = static_cast<int>(A->Nrows);
+  const int N = static_cast<int>(A.Nrows);
 
   int size;
-  MPI_Comm_size(A->comm, &size);
-  int* counts = new int[size];
-  int* offsets = new int[size];
+  MPI_Comm_size(A.comm, &size);
+  libp::memory<int> counts(size);
+  libp::memory<int> offsets(size);
 
   //collect partitioning info
-  MPI_Allgather(    &N, 1, MPI_INT,
-                counts, 1, MPI_INT, A->comm);
+  MPI_Allgather(&N,           1, MPI_INT,
+                counts.ptr(), 1, MPI_INT, A.comm);
 
   int Ntotal=0;
   for (int r=0;r<size;++r) {
@@ -80,52 +80,45 @@ void mgLevel_t::FiedlerVector() {
   }
 
   //populate local dense matrix
-  dfloat *localA = new dfloat[N*Ntotal];
-
-  #pragma omp parallel for
-  for (int n=0;n<N;n++) {
-    for (int m=0;m<Ntotal;m++) {
-      localA[n*Ntotal+m] = 0;
-    }
-  }
+  libp::memory<double> localA(N*Ntotal, 0.0);
 
   /*Add sparse entries*/
   #pragma omp parallel for
   for (int n=0;n<N;n++) {
-    const int start = static_cast<int>(A->diag.rowStarts[n]);
-    const int end   = static_cast<int>(A->diag.rowStarts[n+1]);
+    const int start = static_cast<int>(A.diag.rowStarts[n]);
+    const int end   = static_cast<int>(A.diag.rowStarts[n+1]);
     for (int m=start;m<end;m++) {
-      const int col = static_cast<int>(A->diag.cols[m] + A->colOffsetL);
-      localA[n*Ntotal+col] += A->diag.vals[m];
+      const int col = static_cast<int>(A.diag.cols[m] + A.colOffsetL);
+      localA[n*Ntotal+col] += A.diag.vals[m];
     }
   }
   #pragma omp parallel for
-  for (int n=0;n<A->offd.nzRows;n++) {
-    const int row   = static_cast<int>(A->offd.rows[n]);
-    const int start = static_cast<int>(A->offd.mRowStarts[n]);
-    const int end   = static_cast<int>(A->offd.mRowStarts[n+1]);
+  for (int n=0;n<A.offd.nzRows;n++) {
+    const int row   = static_cast<int>(A.offd.rows[n]);
+    const int start = static_cast<int>(A.offd.mRowStarts[n]);
+    const int end   = static_cast<int>(A.offd.mRowStarts[n+1]);
     for (int m=start;m<end;m++) {
-      const int col = static_cast<int>(A->colMap[A->offd.cols[m]]);
-      localA[row*Ntotal+col] += A->offd.vals[m];
+      const int col = static_cast<int>(A.colMap[A.offd.cols[m]]);
+      localA[row*Ntotal+col] += A.offd.vals[m];
     }
   }
 
   //assemble the full matrix
-  dfloat *M = new dfloat[Ntotal*Ntotal];
+  libp::memory<double> M(Ntotal*Ntotal);
 
   for (int r=0;r<size;++r) {
     counts[r] *= Ntotal;
     offsets[r] *= Ntotal;
   }
 
-  MPI_Allgatherv(localA, N*Ntotal, MPI_DFLOAT,
-                 M, counts, offsets, MPI_DFLOAT,
-                 A->comm);
+  MPI_Allgatherv(localA.ptr(), N*Ntotal, MPI_DOUBLE,
+                 M.ptr(), counts.ptr(), offsets.ptr(), MPI_DOUBLE,
+                 A.comm);
 
-  MPI_Barrier(A->comm);
-  delete[] localA;
-  delete[] counts;
-  delete[] offsets;
+  MPI_Barrier(A.comm);
+  localA.free();
+  counts.free();
+  offsets.free();
 
   /*Call LaPack to find eigen pairs*/
   int INFO = -999;
@@ -134,12 +127,12 @@ void mgLevel_t::FiedlerVector() {
   int LWORK = -1;
   int LDA = Ntotal;
   double WORKSIZE=0.0;
-  double *W= new double[Ntotal];
-  dsyev_(&JOBZ, &UPLO, &Ntotal, M, &LDA, W, &WORKSIZE, &LWORK, &INFO); //Size query
+  libp::memory<double> W(Ntotal);
+  dsyev_(&JOBZ, &UPLO, &Ntotal, M.ptr(), &LDA, W.ptr(), &WORKSIZE, &LWORK, &INFO); //Size query
 
   LWORK = int(WORKSIZE);
   double *WORK= new double[LWORK];
-  dsyev_(&JOBZ, &UPLO, &Ntotal, M, &LDA, W, WORK, &LWORK, &INFO);
+  dsyev_(&JOBZ, &UPLO, &Ntotal, M.ptr(), &LDA, W.ptr(), WORK, &LWORK, &INFO);
   delete[] WORK;
 
   if(INFO) {
@@ -169,9 +162,9 @@ void mgLevel_t::FiedlerVector() {
 
   // printf("min1 = %f, minloc1 = %d \n", min1, minloc1);
 
-  double* minV = M + minloc1*Ntotal;
+  libp::memory<double> minV = M + minloc1*Ntotal;
   for (int i=0;i<N;++i) {
-    Fiedler[i] = minV[i+A->rowOffsetL];
+    Fiedler[i] = minV[i+A.rowOffsetL];
   }
 
   // Fiedler vector is already orthogonal to null
@@ -179,13 +172,10 @@ void mgLevel_t::FiedlerVector() {
   /* Fiedler vector is probably already normalized, but just in case */
   dfloat norm = 0.0;
   for (dlong n=0;n<N;++n) norm += Fiedler[n]*Fiedler[n];
-  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, A->comm);
+  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, A.comm);
   norm = sqrt(norm);
 
   for (dlong n=0;n<N;++n) Fiedler[n] /= norm;
-
-  delete[] W;
-  delete[] M;
 }
 
 } //namespace paradogs

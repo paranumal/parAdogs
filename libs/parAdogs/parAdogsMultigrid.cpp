@@ -36,8 +36,8 @@ namespace paradogs {
 /* Multigrid vcycle                     */
 /****************************************/
 void graph_t::MultigridVcycle(const int l,
-                              dfloat r[],
-                              dfloat x[]) {
+                              libp::memory<dfloat>& r,
+                              libp::memory<dfloat>& x) {
 
   //check for base level
   if(l==Nlevels-1) {
@@ -46,11 +46,11 @@ void graph_t::MultigridVcycle(const int l,
   }
 
   mgLevel_t& Lf = L[l];
-  dfloat *res = Lf.RES;
+  libp::memory<dfloat>& res = Lf.RES;
 
   mgLevel_t& Lc = L[l+1];
-  dfloat *rC = Lc.RHS;
-  dfloat *xC = Lc.X;
+  libp::memory<dfloat>& rC = Lc.RHS;
+  libp::memory<dfloat>& xC = Lc.X;
 
   //Pre smooth and then compute res = rhs-Ax
   Lf.Smooth(r, x, true);
@@ -70,21 +70,21 @@ void graph_t::MultigridVcycle(const int l,
   Lf.Smooth(r, x, false);
 }
 
-void mgLevel_t::Residual(dfloat r[], dfloat x[], dfloat res[]) {
-  A->SpMV(-1.0, x, 1.0, r, res);
+void mgLevel_t::Residual(libp::memory<dfloat>& r, libp::memory<dfloat>& x, libp::memory<dfloat>& res) {
+  A.SpMV(-1.0, x, 1.0, r, res);
 }
 
-void mgLevel_t::Coarsen(dfloat x[], dfloat xC[]) {
-  R->SpMV(1.0, x, 0.0, xC);
+void mgLevel_t::Coarsen(libp::memory<dfloat>& x, libp::memory<dfloat>& xC) {
+  R.SpMV(1.0, x, 0.0, xC);
 }
 
-void mgLevel_t::Prolongate(dfloat xC[], dfloat x[]) {
-  P->SpMV(1.0, xC, 1.0, x);
+void mgLevel_t::Prolongate(libp::memory<dfloat>& xC, libp::memory<dfloat>& x) {
+  P.SpMV(1.0, xC, 1.0, x);
 }
 
-void mgLevel_t::Smooth(dfloat r[], dfloat x[], const bool xIsZero) {
+void mgLevel_t::Smooth(libp::memory<dfloat>& r, libp::memory<dfloat>& x, const bool xIsZero) {
   const int ChebyshevIterations=2;
-  A->SmoothChebyshev(r, x, lambda0, lambda1,
+  A.SmoothChebyshev(r, x, lambda0, lambda1,
                      xIsZero, scratch,
                      ChebyshevIterations);
 }

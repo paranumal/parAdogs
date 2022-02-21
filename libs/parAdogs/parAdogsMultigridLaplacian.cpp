@@ -36,8 +36,8 @@ namespace paradogs {
 void graph_t::CreateLaplacian() {
 
   Nlevels=1;
-  L[0].A = new parCSR(Nverts, Nverts, platform, comm);
-  parCSR& A = *(L[0].A);
+  L[0].A = parCSR(Nverts, Nverts, platform, comm);
+  parCSR& A = L[0].A;
 
   A.rowOffsetL = VoffsetL;
   A.rowOffsetU = VoffsetU;
@@ -45,8 +45,8 @@ void graph_t::CreateLaplacian() {
   A.colOffsetU = VoffsetU;
 
   /*Create a graph Laplacian from mesh info*/
-  A.diag.rowStarts = new dlong[Nverts+1];
-  A.offd.rowStarts = new dlong[Nverts+1];
+  A.diag.rowStarts.malloc(Nverts+1);
+  A.offd.rowStarts.malloc(Nverts+1);
 
   #pragma omp parallel for
   for (dlong n=0;n<Nverts+1;++n) {
@@ -75,8 +75,8 @@ void graph_t::CreateLaplacian() {
     if (A.offd.rowStarts[e+1]>0) A.offd.nzRows++;
   }
 
-  A.offd.rows       = new dlong[A.offd.nzRows];
-  A.offd.mRowStarts = new dlong[A.offd.nzRows+1];
+  A.offd.rows.malloc(A.offd.nzRows);
+  A.offd.mRowStarts.malloc(A.offd.nzRows+1);
 
   /*cumulative sum*/
   dlong cnt=0;
@@ -95,7 +95,7 @@ void graph_t::CreateLaplacian() {
 
   /*Halo setup*/
   cnt=0;
-  colIds = new hlong[A.offd.nnz];
+  colIds.malloc(A.offd.nnz);
   for (dlong e=0;e<Nverts;++e) {
     for (int n=0;n<Nfaces;++n) {
       const hlong gE = elements[e].E[n];
@@ -110,12 +110,12 @@ void graph_t::CreateLaplacian() {
   Nhalo = A.Ncols-A.Nrows; /*Record how big the halo region is*/
 
   /*Build connectivity*/
-  A.diagA = new dfloat[A.Ncols];
-  A.diagInv = new dfloat[A.Nrows];
-  A.diag.cols = new dlong[A.diag.nnz];
-  A.offd.cols = new dlong[A.offd.nnz];
-  A.diag.vals = new dfloat[A.diag.nnz];
-  A.offd.vals = new dfloat[A.offd.nnz];
+  A.diagA.malloc(A.Ncols);
+  A.diagInv.malloc(A.Nrows);
+  A.diag.cols.malloc(A.diag.nnz);
+  A.offd.cols.malloc(A.offd.nnz);
+  A.diag.vals.malloc(A.diag.nnz);
+  A.offd.vals.malloc(A.offd.nnz);
 
   A.diag.nnz=0;
   A.offd.nnz=0;
@@ -146,14 +146,14 @@ void graph_t::CreateLaplacian() {
   }
 
   //fill the halo region
-  A.halo.Exchange(A.diagA, 1, ogs::Dfloat);
+  A.halo.Exchange(A.diagA.ptr(), 1, ogs::Dfloat);
 
   L[0].Nrows = A.Nrows;
   L[0].Ncols = A.Ncols;
   L[0].Nglobal = NVertsGlobal;
 
   /*Construct fine null vector*/
-  L[0].null = new dfloat[Nverts];
+  L[0].null.malloc(Nverts);
 
   #pragma omp parallel for
   for (dlong n=0;n<Nverts;++n) {
