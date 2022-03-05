@@ -26,6 +26,7 @@ SOFTWARE.
 
 #include "parAdogs.hpp"
 #include "parAdogs/parAdogsGraph.hpp"
+#include "timer.hpp"
 #include <random>
 
 namespace libp {
@@ -41,21 +42,17 @@ void MeshPartition(platform_t &platform,
                    const  int Nverts,
                    const  int Nfaces,
                    const  int NfaceVertices,
-                   const  libp::memory<int>& faceVertices,
-                   libp::memory<hlong>& EToV,
-                   libp::memory<hlong>& EToE,
-                   libp::memory<int>& EToF,
-                   libp::memory<dfloat>& EX,
-                   libp::memory<dfloat>& EY,
-                   libp::memory<dfloat>& EZ,
-                   MPI_Comm comm) {
+                   const  memory<int>& faceVertices,
+                   memory<hlong>& EToV,
+                   memory<hlong>& EToE,
+                   memory<int>& EToF,
+                   memory<dfloat>& EX,
+                   memory<dfloat>& EY,
+                   memory<dfloat>& EZ,
+                   comm_t comm) {
 
   /* Create RNG*/
-  int rank;
-  int size;
-  MPI_Comm_rank(comm, &rank);
-  MPI_Comm_size(comm, &size);
-  RNG = std::mt19937(rank);
+  RNG = std::mt19937(comm.rank());
 
   /* Create graph from mesh info*/
   graph_t graph(platform,
@@ -71,14 +68,14 @@ void MeshPartition(platform_t &platform,
                 EZ,
                 comm);
 
-  double timeStart = MPI_Wtime();
+  timePoint_t timeStart = GlobalTime(comm);
 
   if (settings.compareSetting("PARADOGS PARTITIONING", "INERTIAL")) {
     /*Inertial partitioning*/
     graph.InertialPartition();
   } else if (settings.compareSetting("PARADOGS PARTITIONING", "SPECTRAL")) {
     /*Connect element faces before partitioning*/
-    if (size>1) graph.Connect();
+    if (comm.size()>1) graph.Connect();
 
     /*Spectral partitioning*/
     graph.SpectralPartition();
@@ -90,14 +87,13 @@ void MeshPartition(platform_t &platform,
   /*Reorder rank-local element list for better locality*/
   graph.CuthillMckee();
 
-  double timeEnd = MPI_Wtime();
-  double elaplsed = timeEnd-timeStart;
-  MPI_Allreduce(MPI_IN_PLACE, &elaplsed, 1, MPI_DOUBLE, MPI_MAX, comm);
+  timePoint_t timeEnd = GlobalTime(comm);
+  double elaplsed = ElapsedTime(timeStart, timeEnd);
 
   /*Print some stats about the partitioning*/
   graph.Report();
 
-  if (rank==0) {
+  if (comm.rank()==0) {
     printf("   Partitioning time:  %5.2f seconds                                                          |\n",
            elaplsed);
     printf("-----------------------------------------------------------------------------------------------\n");

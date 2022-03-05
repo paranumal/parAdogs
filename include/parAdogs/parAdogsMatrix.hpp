@@ -44,7 +44,7 @@ struct nonZero_t {
 class parCSR {
 public:
   platform_t platform;
-  MPI_Comm comm;
+  comm_t comm;
 
   dlong Nrows=0;
   dlong Ncols=0;
@@ -56,9 +56,9 @@ public:
   //local sparse matrix
   struct CSR {
     dlong nnz=0;
-    libp::memory<dlong>  rowStarts;
-    libp::memory<dlong>  cols;
-    libp::memory<pfloat> vals;
+    memory<dlong>  rowStarts;
+    memory<dlong>  cols;
+    memory<pfloat> vals;
   };
   CSR diag;
 
@@ -67,56 +67,56 @@ public:
     dlong nnz=0;
     dlong nzRows=0;
 
-    libp::memory<dlong>  rowStarts;
-    libp::memory<dlong>  mRowStarts;
-    libp::memory<dlong>  rows;
-    libp::memory<dlong>  cols;
-    libp::memory<pfloat> vals;
+    memory<dlong>  rowStarts;
+    memory<dlong>  mRowStarts;
+    memory<dlong>  rows;
+    memory<dlong>  cols;
+    memory<pfloat> vals;
   };
   MCSR offd;
 
-  libp::memory<dfloat> diagA;
-  libp::memory<dfloat> diagInv;
+  memory<dfloat> diagA;
+  memory<dfloat> diagInv;
 
   /*communcation info*/
   dlong NlocalCols = 0;
   ogs::halo_t halo;
-  libp::memory<hlong> colMap;
+  memory<hlong> colMap;
 
   //rho ~= cond(invD * A)
   dfloat rho=0.0;
 
   parCSR()=default;
-  parCSR(dlong N, dlong M, platform_t& _platform, MPI_Comm _comm):
+  parCSR(dlong N, dlong M, platform_t& _platform, comm_t _comm):
     platform(_platform), comm(_comm), Nrows(N), Ncols(M) {}
 
   //build a parCSR matrix from a distributed COO matrix
   parCSR(dlong _Nrows, dlong _Ncols,
          const dlong NNZ,
-         libp::memory<nonZero_t>& entries,
+         memory<nonZero_t>& entries,
          const platform_t &_platform,
-         MPI_Comm comm);
+         comm_t comm);
 
-  void haloSetup(libp::memory<hlong>& colIds);
+  void haloSetup(memory<hlong>& colIds);
 
   // estimate rho(invD * A)
-  dfloat rhoDinvA(libp::memory<dfloat>& null);
+  dfloat rhoDinvA(memory<dfloat>& null);
 
   /*Aggregate via distance-2 PMIS*/
   void Aggregate(dlong& cNverts,
                  const dfloat theta,
-                 libp::memory<hlong>& FineToCoarse);
+                 memory<hlong>& FineToCoarse);
 
   void GalerkinProduct(const parCSR &A, const parCSR &P);
 
-  void SpMV(const dfloat alpha, libp::memory<dfloat>& x,
-            const dfloat beta, libp::memory<dfloat>& y);
-  void SpMV(const dfloat alpha, libp::memory<dfloat>& x,
-            const dfloat beta, const libp::memory<dfloat>& y, libp::memory<dfloat>& z);
+  void SpMV(const dfloat alpha, memory<dfloat>& x,
+            const dfloat beta, memory<dfloat>& y);
+  void SpMV(const dfloat alpha, memory<dfloat>& x,
+            const dfloat beta, const memory<dfloat>& y, memory<dfloat>& z);
 
-  void SmoothChebyshev(libp::memory<dfloat>& b, libp::memory<dfloat>& x,
+  void SmoothChebyshev(memory<dfloat>& b, memory<dfloat>& x,
                        const dfloat lambda0, const dfloat lambda1,
-                       const bool xIsZero, libp::memory<dfloat>& scratch,
+                       const bool xIsZero, memory<dfloat>& scratch,
                        const int ChebyshevIterations);
 };
 

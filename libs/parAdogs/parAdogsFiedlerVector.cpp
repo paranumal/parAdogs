@@ -37,7 +37,7 @@ namespace libp {
 namespace paradogs {
 
 /*Compute Fiedler vector of graph via multilevel heirarchy*/
-libp::memory<dfloat>& graph_t::FiedlerVector() {
+memory<dfloat>& graph_t::FiedlerVector() {
 
   /*Fiedler vector on coarsest level*/
   L[Nlevels-1].FiedlerVector();
@@ -61,14 +61,12 @@ void mgLevel_t::FiedlerVector() {
 
   const int N = static_cast<int>(A.Nrows);
 
-  int size;
-  MPI_Comm_size(A.comm, &size);
-  libp::memory<int> counts(size);
-  libp::memory<int> offsets(size);
+  int size = A.comm.size();
+  memory<int> counts(size);
+  memory<int> offsets(size);
 
   //collect partitioning info
-  MPI_Allgather(&N,           1, MPI_INT,
-                counts.ptr(), 1, MPI_INT, A.comm);
+  A.comm.Allgather(N, counts);
 
   int Ntotal=0;
   for (int r=0;r<size;++r) {
@@ -80,7 +78,7 @@ void mgLevel_t::FiedlerVector() {
   }
 
   //populate local dense matrix
-  libp::memory<double> localA(N*Ntotal, 0.0);
+  memory<double> localA(N*Ntotal, 0.0);
 
   /*Add sparse entries*/
   #pragma omp parallel for
@@ -104,18 +102,16 @@ void mgLevel_t::FiedlerVector() {
   }
 
   //assemble the full matrix
-  libp::memory<double> M(Ntotal*Ntotal);
+  memory<double> M(Ntotal*Ntotal);
 
   for (int r=0;r<size;++r) {
     counts[r] *= Ntotal;
     offsets[r] *= Ntotal;
   }
 
-  MPI_Allgatherv(localA.ptr(), N*Ntotal, MPI_DOUBLE,
-                 M.ptr(), counts.ptr(), offsets.ptr(), MPI_DOUBLE,
-                 A.comm);
+  A.comm.Allgatherv(localA, N*Ntotal,
+                    M, counts, offsets);
 
-  MPI_Barrier(A.comm);
   localA.free();
   counts.free();
   offsets.free();
@@ -127,7 +123,7 @@ void mgLevel_t::FiedlerVector() {
   int LWORK = -1;
   int LDA = Ntotal;
   double WORKSIZE=0.0;
-  libp::memory<double> W(Ntotal);
+  memory<double> W(Ntotal);
   dsyev_(&JOBZ, &UPLO, &Ntotal, M.ptr(), &LDA, W.ptr(), &WORKSIZE, &LWORK, &INFO); //Size query
 
   LWORK = int(WORKSIZE);
@@ -135,11 +131,8 @@ void mgLevel_t::FiedlerVector() {
   dsyev_(&JOBZ, &UPLO, &Ntotal, M.ptr(), &LDA, W.ptr(), WORK, &LWORK, &INFO);
   delete[] WORK;
 
-  if(INFO) {
-    std::stringstream ss;
-    ss << "Paradogs: dsyev_ reports info = " << INFO << " in FiedlerVector";
-    LIBP_ABORT(ss.str());
-  }
+  LIBP_ABORT("Paradogs: dsyev_ reports info = " << INFO << " in FiedlerVector",
+             INFO);
 
   /*Find the second smallest eigenvalue (the smallest is 0)*/
   double min0 = std::numeric_limits<double>::max();
@@ -162,7 +155,7 @@ void mgLevel_t::FiedlerVector() {
 
   // printf("min1 = %f, minloc1 = %d \n", min1, minloc1);
 
-  libp::memory<double> minV = M + minloc1*Ntotal;
+  memory<double> minV = M + minloc1*Ntotal;
   for (int i=0;i<N;++i) {
     Fiedler[i] = minV[i+A.rowOffsetL];
   }
@@ -172,7 +165,7 @@ void mgLevel_t::FiedlerVector() {
   /* Fiedler vector is probably already normalized, but just in case */
   dfloat norm = 0.0;
   for (dlong n=0;n<N;++n) norm += Fiedler[n]*Fiedler[n];
-  MPI_Allreduce(MPI_IN_PLACE, &norm, 1, MPI_DFLOAT, MPI_SUM, A.comm);
+  A.comm.Allreduce(norm);
   norm = sqrt(norm);
 
   for (dlong n=0;n<N;++n) Fiedler[n] /= norm;

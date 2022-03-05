@@ -31,11 +31,11 @@ namespace libp {
 
 namespace paradogs {
 
-void coarseSolver_t::Solve(libp::memory<dfloat>& rhs, libp::memory<dfloat>& x) {
+void coarseSolver_t::Solve(memory<dfloat>& rhs, memory<dfloat>& x) {
 
   //gather the global rhs
-  MPI_Allgatherv(rhs.ptr(), N, MPI_DFLOAT,
-                 grhs.ptr(), coarseCounts.ptr(), coarseOffsets.ptr(), MPI_DFLOAT, comm);
+  comm.Allgatherv(rhs, N,
+                  grhs, coarseCounts, coarseOffsets);
 
   #pragma omp parallel for
   for (int n=0;n<N;++n) {
@@ -47,11 +47,10 @@ void coarseSolver_t::Solve(libp::memory<dfloat>& rhs, libp::memory<dfloat>& x) {
   }
 }
 
-void coarseSolver_t::Setup(parCSR& A, libp::memory<dfloat>& null) {
+void coarseSolver_t::Setup(parCSR& A, memory<dfloat>& null) {
 
   comm = A.comm;
-  int size;
-  MPI_Comm_size(comm, &size);
+  int size = comm.size();
 
   N = static_cast<int>(A.Nrows);
   Nrows = A.Nrows;
@@ -61,8 +60,7 @@ void coarseSolver_t::Setup(parCSR& A, libp::memory<dfloat>& null) {
   coarseOffsets.malloc(size);
 
   //collect partitioning info
-  MPI_Allgather(&N, 1, MPI_INT,
-                coarseCounts.ptr(), 1, MPI_INT, comm);
+  comm.Allgather(N, coarseCounts);
 
   coarseTotal=0;
   for (int r=0;r<size;++r) {
@@ -74,14 +72,13 @@ void coarseSolver_t::Setup(parCSR& A, libp::memory<dfloat>& null) {
   }
 
   //gather global null vector
-  libp::memory<dfloat> gnull(coarseTotal);
+  memory<dfloat> gnull(coarseTotal);
 
-  MPI_Allgatherv( null.ptr(), N, MPI_DFLOAT,
-                 gnull.ptr(), coarseCounts.ptr(), coarseOffsets.ptr(), MPI_DFLOAT,
-                 comm);
+  comm.Allgatherv( null, N,
+                  gnull, coarseCounts, coarseOffsets);
 
   //populate local dense matrix
-  libp::memory<dfloat> localA(N*coarseTotal);
+  memory<dfloat> localA(N*coarseTotal);
 
   /*Fill the matrix with the null boost*/
   #pragma omp parallel for
@@ -114,18 +111,15 @@ void coarseSolver_t::Setup(parCSR& A, libp::memory<dfloat>& null) {
   }
 
   //assemble the full matrix
-  libp::memory<dfloat> gA(coarseTotal*coarseTotal);
+  memory<dfloat> gA(coarseTotal*coarseTotal);
 
   for (int r=0;r<size;++r) {
     coarseCounts[r] *= coarseTotal;
     coarseOffsets[r] *= coarseTotal;
   }
 
-  MPI_Allgatherv(localA.ptr(), N*coarseTotal, MPI_DFLOAT,
-                 gA.ptr(), coarseCounts.ptr(), coarseOffsets.ptr(), MPI_DFLOAT,
-                 comm);
-
-  MPI_Barrier(comm);
+  comm.Allgatherv(localA, N*coarseTotal,
+                      gA, coarseCounts, coarseOffsets);
   localA.free();
 
   for (int r=0;r<size;++r) {

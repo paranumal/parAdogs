@@ -87,8 +87,12 @@ LIBMESH_DEFINES=-DMESH_DIR='"${LIBMESH_DIR}"'
 LIBOGS_DEFINES=-DLIBP_DIR='"${LIBP_DIR}"'  -DOGS_DIR='"${LIBOGS_DIR}"'
 LIBPARADOGS_DEFINES=
 
+ifeq (true,${gpu-aware-mpi})
+  LIBOGS_DEFINES+= -DGPU_AWARE_MPI
+endif
+
 #.cpp compilation flags
-LIB_CXXFLAGS=${LIBP_DEFINES} ${LIBP_MPICXXFLAGS} ${INCLUDES}
+LIB_CXXFLAGS=${LIBP_DEFINES} ${LIBP_CXXFLAGS} ${INCLUDES}
 
 #object dependancies
 LIB_DEPS=$(wildcard $(LIBP_INCLUDE_DIR)/*.h)  \
@@ -115,7 +119,7 @@ LIBOGS_OBJS=$(LIBOGS_SRC:.cpp=.o)
 LIBPARADOGS_OBJS=$(LIBPARADOGS_SRC:.cpp=.o)
 
 .PHONY: all core mesh ogs paradogs \
-				clean clean-kernels realclean silentUpdate-core             \
+				clean clean-kernels realclean silentUpdate-core  \
 				silentUpdate-mesh silentUpdate-paradogs
 
 
@@ -176,34 +180,34 @@ ${OCCA_DIR}/lib/libocca.so:
 # rule for .cpp files
 core/%.o: core/%.cpp $(LIB_DEPS) ${OCCA_DIR}/lib/libocca.so
 ifneq (,${verbose})
-	$(LIBP_MPICXX) -o $@ -c $< ${LIBCORE_DEFINES} $(LIB_CXXFLAGS)
+	$(LIBP_CXX) -o $@ -c $< ${LIBCORE_DEFINES} $(LIB_CXXFLAGS)
 else
 	@printf "%b" "$(OBJ_COLOR)Compiling $(@F)$(NO_COLOR)\n";
-	@$(LIBP_MPICXX) -o $@ -c $< ${LIBCORE_DEFINES} $(LIB_CXXFLAGS)
+	@$(LIBP_CXX) -o $@ -c $< ${LIBCORE_DEFINES} $(LIB_CXXFLAGS)
 endif
 
 ogs/%.o: ogs/%.cpp $(LIBOGS_DEPS) | libcore.a
 ifneq (,${verbose})
-	$(LIBP_MPICXX) -o $@ -c $< ${LIBOGS_DEFINES} $(LIB_CXXFLAGS)
+	$(LIBP_CXX) -o $@ -c $< ${LIBOGS_DEFINES} $(LIB_CXXFLAGS)
 else
 	@printf "%b" "$(OBJ_COLOR)Compiling $(@F)$(NO_COLOR)\n";
-	@$(LIBP_MPICXX) -o $@ -c $< ${LIBOGS_DEFINES} $(LIB_CXXFLAGS)
+	@$(LIBP_CXX) -o $@ -c $< ${LIBOGS_DEFINES} $(LIB_CXXFLAGS)
 endif
 
 parAdogs/%.o: parAdogs/%.cpp $(LIBPARADOGS_DEPS) | libcore.a libogs.a
 ifneq (,${verbose})
-	$(LIBP_MPICXX) -o $@ -c $< ${LIBPARADOGS_DEFINES} $(LIB_CXXFLAGS)
+	$(LIBP_CXX) -o $@ -c $< ${LIBPARADOGS_DEFINES} $(LIB_CXXFLAGS)
 else
 	@printf "%b" "$(OBJ_COLOR)Compiling $(@F)$(NO_COLOR)\n";
-	@$(LIBP_MPICXX) -o $@ -c $< ${LIBPARADOGS_DEFINES} $(LIB_CXXFLAGS)
+	@$(LIBP_CXX) -o $@ -c $< ${LIBPARADOGS_DEFINES} $(LIB_CXXFLAGS)
 endif
 
 mesh/%.o: mesh/%.cpp $(LIBMESH_DEPS) | libcore.a libogs.a libparadogs.a
 ifneq (,${verbose})
-	$(LIBP_MPICXX) -o $@ -c $< ${LIBMESH_DEFINES} $(LIB_CXXFLAGS)
+	$(LIBP_CXX) -o $@ -c $< ${LIBMESH_DEFINES} $(LIB_CXXFLAGS)
 else
 	@printf "%b" "$(OBJ_COLOR)Compiling $(@F)$(NO_COLOR)\n";
-	@$(LIBP_MPICXX) -o $@ -c $< ${LIBMESH_DEFINES} $(LIB_CXXFLAGS)
+	@$(LIBP_CXX) -o $@ -c $< ${LIBMESH_DEFINES} $(LIB_CXXFLAGS)
 endif
 
 #cleanup

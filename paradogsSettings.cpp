@@ -27,7 +27,7 @@ SOFTWARE.
 #include "paradogsMain.hpp"
 
 //settings for cns solver
-paradogsSettings_t::paradogsSettings_t(MPI_Comm& _comm):
+paradogsSettings_t::paradogsSettings_t(comm_t _comm):
   settings_t(_comm) {
 
 }
@@ -54,9 +54,7 @@ void paradogsSettings_t::parseFromFile(platformSettings_t& platformSettings,
     else if (hasSetting(name)) //self
       changeSetting(name, val);
     else  {
-      std::stringstream ss;
-      ss << "Unknown setting: [" << name << "] requested";
-      LIBP_ABORT(ss.str());
+      LIBP_FORCE_ABORT("Unknown setting: [" << name << "] requested");
     }
   }
 }

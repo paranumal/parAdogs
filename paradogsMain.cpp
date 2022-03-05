@@ -30,13 +30,13 @@ SOFTWARE.
 int main(int argc, char **argv){
 
   // start up MPI
-  MPI_Init(&argc, &argv);
+  comm_t::Init(argc, argv);
 
   {
-    MPI_Comm comm = MPI_COMM_WORLD;
+    comm_t comm(comm_t::world().Dup());
 
-    if(argc!=2)
-      LIBP_ABORT(std::string("Usage: ./paradogsMain setupfile"));
+    LIBP_ABORT(std::string("Usage: ./paradogsMain setupfile"),
+               argc!=2);
 
     //create default settings
     platformSettings_t platformSettings(comm);
@@ -59,6 +59,6 @@ int main(int argc, char **argv){
   }
 
   // close down MPI
-  MPI_Finalize();
+  comm_t::Finalize();
   return LIBP_SUCCESS;
 }

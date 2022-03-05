@@ -2,7 +2,7 @@
 
 The MIT License (MIT)
 
-Copyright (c) 2017 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
+Copyright (c) 2020 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,50 +24,37 @@ SOFTWARE.
 
 */
 
-#include "parAdogs.hpp"
-#include "parAdogs/parAdogsGraph.hpp"
-#include "parAdogs/parAdogsPartition.hpp"
+#include "timer.hpp"
 
 namespace libp {
 
-namespace paradogs {
-
-/****************************************/
-/* Multilevel Spectral Bipartition      */
-/****************************************/
-void graph_t::SpectralBipartition(const dfloat targetFraction[2]) {
-
-  /*Create multilevel heirarchy*/
-  MultigridSetup();
-
-  /*Compute Fiedler vector */
-  memory<dfloat>& Fiedler = FiedlerVector();
-
-  /*Use Fiedler vector to bipartion graph*/
-  const hlong K = std::ceil(targetFraction[0]*NVertsGlobal);
-  const dfloat pivot = ParallelPivot(Nverts, Fiedler, K, comm);
-
-  memory<int> partition(L[0].A.Ncols);
-
-  for (dlong n=0;n<Nverts;++n) {
-    if (Fiedler[n]<=pivot) {
-      partition[n] = 0;
-    } else {
-      partition[n] = 1;
-    }
-  }
-
-  /*Fill halo region of partition vector*/
-  L[0].A.halo.Exchange(partition, 1);
-
-  /*Split the graph according to this partitioning*/
-  Split(partition);
-
-  /*Clear the coarse levels*/
-  MultigridDestroy();
+/* Host time*/
+timePoint_t Time() {
+  return std::chrono::high_resolution_clock::now();
 }
 
-} //namespace paradogs
+/* Host time after global sync*/
+timePoint_t GlobalTime(comm_t comm) {
+  comm.Barrier();
+  return Time();
+}
+
+/* Host time after platform sync*/
+timePoint_t PlatformTime(platform_t &platform) {
+  platform.finish();
+  return Time();
+}
+
+/* Host time after platform sync*/
+timePoint_t GlobalPlatformTime(platform_t &platform) {
+  platform.finish();
+  platform.comm.Barrier();
+  return Time();
+}
+
+/*Time between time points, in seconds*/
+double ElapsedTime(const timePoint_t start, const timePoint_t end) {
+  return std::chrono::duration_cast<std::chrono::microseconds>(end-start).count()/(1.0e6);
+}
 
 } //namespace libp
-

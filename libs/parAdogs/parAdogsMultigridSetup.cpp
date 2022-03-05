@@ -59,8 +59,8 @@ void graph_t::MultigridSetup() {
       break;
     }
 
-    if (Nlevels>=MAX_LEVELS)
-      LIBP_ABORT("Paradogs: Max levels exceeded in coarse graph creation. Increase MAX_LEVELS.")
+    LIBP_ABORT("Paradogs: Max levels exceeded in coarse graph creation. Increase MAX_LEVELS.",
+               Nlevels>=MAX_LEVELS);
 
     Lf.SetupSmoother();
 
@@ -75,9 +75,7 @@ void graph_t::MultigridSetup() {
 
     /*Check for stalls*/
     if (Lc.Nglobal > coarseTol*Lf.Nglobal) {
-      std::stringstream ss;
-      ss << "Paradogs: Graph coarsening stalling. Coarse graph has " << Lc.Nglobal << " nodes.";
-      LIBP_WARNING(ss.str())
+      LIBP_FORCE_WARNING("Paradogs: Graph coarsening stalling. Coarse graph has " << Lc.Nglobal << " nodes.");
       coarseSolver.Setup(Lc.A, Lc.null);
       break;
     }
@@ -126,7 +124,7 @@ void mgLevel_t::CoarsenLevel(mgLevel_t& Lf, const dfloat theta) {
 
   /*Create a vertex matching*/
   dlong Nc=0;
-  libp::memory<hlong> FineToCoarse(Lf.Ncols);
+  memory<hlong> FineToCoarse(Lf.Ncols);
   Lf.A.Aggregate(Nc, theta, FineToCoarse);
 
   /* Tentative prolongation operator*/
@@ -170,13 +168,13 @@ void mgLevel_t::CoarsenLevel(mgLevel_t& Lf, const dfloat theta) {
   }
 
   //fill the halo region
-  A.halo.Exchange(A.diagA.ptr(), 1, ogs::Dfloat);
+  A.halo.Exchange(A.diagA, 1);
 
   Nrows = A.Nrows;
   Ncols = std::max(A.Ncols, Lf.P.Ncols);
 
   Nglobal = static_cast<hlong>(Nrows);
-  MPI_Allreduce(MPI_IN_PLACE, &Nglobal, 1, MPI_HLONG, MPI_SUM, A.comm);
+  A.comm.Allreduce(Nglobal);
 }
 
 /*Free coarse levels of hierarchy*/

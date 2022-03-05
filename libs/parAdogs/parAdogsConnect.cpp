@@ -43,15 +43,16 @@ typedef struct {
 void graph_t::Connect(){
 
   /*Global number of elements*/
-  hlong localNverts=static_cast<hlong>(Nverts);
-  MPI_Allreduce(&localNverts, &gNVertsGlobal, 1, MPI_HLONG, MPI_SUM, gcomm);
+  gNVertsGlobal=static_cast<hlong>(Nverts);
+  gcomm.Allreduce(gNVertsGlobal);
 
   /*Get global element count offsets*/
-  MPI_Scan(&localNverts, &gVoffsetU, 1, MPI_HLONG, MPI_SUM, gcomm);
+  hlong localNverts=static_cast<hlong>(Nverts);
+  gcomm.Scan(localNverts, gVoffsetU);
   gVoffsetL = gVoffsetU-Nverts;
 
   /* build list of faces */
-  libp::memory<parallelFace_t> faces(Nelements*Nfaces);
+  memory<parallelFace_t> faces(Nelements*Nfaces);
 
   for(dlong e=0;e<Nelements;++e){
     for(int f=0;f<Nfaces;++f){
@@ -108,10 +109,10 @@ void graph_t::Connect(){
 
   // count # of elements to send to each rank based on
   // minimum {vertex id % gsize}
-  libp::memory<int> Nsend(gsize, 0);
-  libp::memory<int> Nrecv(gsize);
-  libp::memory<int> sendOffsets(gsize);
-  libp::memory<int> recvOffsets(gsize);
+  memory<int> Nsend(gsize, 0);
+  memory<int> Nrecv(gsize);
+  memory<int> sendOffsets(gsize);
+  memory<int> recvOffsets(gsize);
 
   int allNsend=0;
   for(dlong e=0;e<Nelements;++e){
@@ -144,28 +145,7 @@ void graph_t::Connect(){
     Nsend[rr] = 0;
 
   // buffer for outgoing data
-  libp::memory<parallelFace_t> sendFaces(allNsend);
-
-  // Make the MPI_PARALLELFACE_T data type
-  MPI_Datatype MPI_PARALLELFACE_T;
-  MPI_Datatype dtype[6] = {MPI_HLONG, MPI_HLONG, MPI_HLONG, MPI_INT,
-                            MPI_INT, MPI_INT};
-  int blength[6] = {MAX_NFACEVERTS, 1, 1, 1, 1, 1};
-  MPI_Aint addr[6], displ[6];
-  MPI_Get_address ( &(sendFaces[0]              ), addr+0);
-  MPI_Get_address ( &(sendFaces[0].element      ), addr+1);
-  MPI_Get_address ( &(sendFaces[0].elementN     ), addr+2);
-  MPI_Get_address ( &(sendFaces[0].face         ), addr+3);
-  MPI_Get_address ( &(sendFaces[0].faceN        ), addr+4);
-  MPI_Get_address ( &(sendFaces[0].rank         ), addr+5);
-  displ[0] = 0;
-  displ[1] = addr[1] - addr[0];
-  displ[2] = addr[2] - addr[0];
-  displ[3] = addr[3] - addr[0];
-  displ[4] = addr[4] - addr[0];
-  displ[5] = addr[5] - addr[0];
-  MPI_Type_create_struct (6, blength, displ, dtype, &MPI_PARALLELFACE_T);
-  MPI_Type_commit (&MPI_PARALLELFACE_T);
+  memory<parallelFace_t> sendFaces(allNsend);
 
   // pack face data
   for(dlong e=0;e<Nelements;++e){
@@ -184,13 +164,10 @@ void graph_t::Connect(){
       }
     }
   }
-
   faces.free();
 
-  // exchange byte counts
-  MPI_Alltoall(Nsend.ptr(), 1, MPI_INT,
-               Nrecv.ptr(), 1, MPI_INT,
-               gcomm);
+  // exchange counts
+  gcomm.Alltoall(Nsend, Nrecv);
 
   // count incoming faces
   int allNrecv = 0;
@@ -203,12 +180,11 @@ void graph_t::Connect(){
     recvOffsets[rr] = recvOffsets[rr-1] + Nrecv[rr-1]; // byte offsets
 
   // buffer for incoming face data
-  libp::memory<parallelFace_t> recvFaces(allNrecv);
+  memory<parallelFace_t> recvFaces(allNrecv);
 
   // exchange parallel faces
-  MPI_Alltoallv(sendFaces.ptr(), Nsend.ptr(), sendOffsets.ptr(), MPI_PARALLELFACE_T,
-                recvFaces.ptr(), Nrecv.ptr(), recvOffsets.ptr(), MPI_PARALLELFACE_T,
-                gcomm);
+  gcomm.Alltoallv(sendFaces, Nsend, sendOffsets,
+                  recvFaces, Nrecv, recvOffsets);
 
   // local sort allNrecv received faces
   std::sort(recvFaces.ptr(), recvFaces.ptr()+allNrecv,
@@ -244,9 +220,8 @@ void graph_t::Connect(){
             });
 
   // send faces back from whence they came
-  MPI_Alltoallv(recvFaces.ptr(), Nrecv.ptr(), recvOffsets.ptr(), MPI_PARALLELFACE_T,
-                sendFaces.ptr(), Nsend.ptr(), sendOffsets.ptr(), MPI_PARALLELFACE_T,
-                gcomm);
+  gcomm.Alltoallv(recvFaces, Nrecv, recvOffsets,
+                  sendFaces, Nsend, sendOffsets);
 
   // extract connectivity info
   for(int cnt=0;cnt<allNsend;++cnt){
@@ -260,9 +235,6 @@ void graph_t::Connect(){
       elements[e].F[f] = fN;
     }
   }
-
-  MPI_Barrier(gcomm);
-  MPI_Type_free(&MPI_PARALLELFACE_T);
 }
 
 } //namespace paradogs

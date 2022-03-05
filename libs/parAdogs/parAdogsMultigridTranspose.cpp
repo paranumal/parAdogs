@@ -41,12 +41,10 @@ namespace paradogs {
 parCSR Transpose(const parCSR& A) {
 
   // MPI info
-  int rank, size;
-  MPI_Comm_rank(A.comm, &rank);
-  MPI_Comm_size(A.comm, &size);
+  int size = A.comm.size();
 
   // copy data from nonlocal entries into send buffer
-  libp::memory<nonZero_t> sendNonZeros(A.offd.nnz);
+  memory<nonZero_t> sendNonZeros(A.offd.nnz);
   for(dlong i=0;i<A.offd.nzRows;++i){
     const hlong row = A.offd.rows[i] + A.rowOffsetL; //global ids
     for (dlong j=A.offd.mRowStarts[i];j<A.offd.mRowStarts[i+1];j++) {
@@ -67,15 +65,14 @@ parCSR Transpose(const parCSR& A) {
             });
 
   // //count number of non-zeros we're sending
-  libp::memory<int> sendCounts(size, 0);
-  libp::memory<int> recvCounts(size);
-  libp::memory<int> sendOffsets(size+1);
-  libp::memory<int> recvOffsets(size+1);
+  memory<int> sendCounts(size, 0);
+  memory<int> recvCounts(size);
+  memory<int> sendOffsets(size+1);
+  memory<int> recvOffsets(size+1);
 
-  libp::memory<hlong> globalColStarts(size+1);
+  memory<hlong> globalColStarts(size+1);
   globalColStarts[0]=0;
-  MPI_Allgather(&(A.colOffsetU), 1, MPI_HLONG,
-                 globalColStarts.ptr()+1, 1, MPI_HLONG, A.comm);
+  A.comm.Allgather(A.colOffsetU, globalColStarts+1);
 
   int r=0;
   for (dlong n=0;n<A.offd.nnz;n++) {
@@ -85,8 +82,7 @@ parCSR Transpose(const parCSR& A) {
   }
   globalColStarts.free();
 
-  MPI_Alltoall(sendCounts.ptr(), 1, MPI_INT,
-               recvCounts.ptr(), 1, MPI_INT, A.comm);
+  A.comm.Alltoall(sendCounts, recvCounts);
 
   sendOffsets[0]=0;
   recvOffsets[0]=0;
@@ -96,30 +92,13 @@ parCSR Transpose(const parCSR& A) {
   }
   dlong offdnnz = recvOffsets[size]; //total offd nonzeros
 
-  libp::memory<nonZero_t> offdNonZeros(offdnnz);
-
-  // Make the MPI_NONZERO_T data type
-  MPI_Datatype MPI_NONZERO_T;
-  MPI_Datatype dtype[3] = {MPI_HLONG, MPI_HLONG, MPI_DFLOAT};
-  int blength[3] = {1, 1, 1};
-  MPI_Aint addr[3], displ[3];
-  MPI_Get_address ( &(offdNonZeros[0]    ), addr+0);
-  MPI_Get_address ( &(offdNonZeros[0].col), addr+1);
-  MPI_Get_address ( &(offdNonZeros[0].val), addr+2);
-  displ[0] = 0;
-  displ[1] = addr[1] - addr[0];
-  displ[2] = addr[2] - addr[0];
-  MPI_Type_create_struct (3, blength, displ, dtype, &MPI_NONZERO_T);
-  MPI_Type_commit (&MPI_NONZERO_T);
+  memory<nonZero_t> offdNonZeros(offdnnz);
 
   // receive non-local nonzeros
-  MPI_Alltoallv(sendNonZeros.ptr(), sendCounts.ptr(), sendOffsets.ptr(), MPI_NONZERO_T,
-                offdNonZeros.ptr(), recvCounts.ptr(), recvOffsets.ptr(), MPI_NONZERO_T,
-                A.comm);
+  A.comm.Alltoallv(sendNonZeros, sendCounts, sendOffsets,
+                   offdNonZeros, recvCounts, recvOffsets);
 
   //clean up
-  MPI_Barrier(A.comm);
-  MPI_Type_free(&MPI_NONZERO_T);
   sendNonZeros.free();
   sendCounts.free();
   recvCounts.free();
@@ -128,10 +107,10 @@ parCSR Transpose(const parCSR& A) {
 
   dlong NNZ = A.diag.nnz+offdnnz;
 
-  libp::memory<nonZero_t> entries(NNZ);
+  memory<nonZero_t> entries(NNZ);
 
-  libp::memory<dlong> rowStarts(A.NlocalCols+1, 0);
-  libp::memory<dlong> rowCounts(A.NlocalCols, 0);
+  memory<dlong> rowStarts(A.NlocalCols+1, 0);
+  memory<dlong> rowCounts(A.NlocalCols, 0);
 
   /*Count entries per row*/
   for(dlong i=0; i<A.Nrows; i++) {

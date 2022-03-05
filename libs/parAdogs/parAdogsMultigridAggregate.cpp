@@ -38,7 +38,7 @@ extern std::mt19937 RNG;
 /*Create a vertex matching using distance-2 aggregation*/
 void parCSR::Aggregate(dlong& Nc,
                        const dfloat theta,
-                       libp::memory<hlong>& FineToCoarse) {
+                       memory<hlong>& FineToCoarse) {
 
   /*Create rng*/
   std::uniform_real_distribution<> distrib(-0.25, 0.25);
@@ -127,16 +127,16 @@ void parCSR::Aggregate(dlong& Nc,
     }
   }
 
-  libp::memory<float> rand(Ncols);
-  libp::memory<int>   Ts(Ncols);
-  libp::memory<float> Tr(Ncols);
-  libp::memory<hlong> Tn(Ncols);
+  memory<float> rand(Ncols);
+  memory<int>   Ts(Ncols);
+  memory<float> Tr(Ncols);
+  memory<hlong> Tn(Ncols);
 
   /*Initialize state array*/
   /*  0 - Undecided */
   /* -1 - Not MIS */
   /*  1 - MIS */
-  libp::memory<int>   state(Ncols, 0);
+  memory<int>   state(Ncols, 0);
 
   /*Use vertex degree with random noise to break ties*/
   // #pragma omp parallel for
@@ -147,7 +147,7 @@ void parCSR::Aggregate(dlong& Nc,
   }
 
   //fill halo region
-  halo.Exchange(rand.ptr(), 1, ogs::Float);
+  halo.Exchange(rand, 1);
 
   do {
     // first neighbours
@@ -179,9 +179,9 @@ void parCSR::Aggregate(dlong& Nc,
     }
 
     //share results
-    halo.Exchange(Ts.ptr(), 1, ogs::Int32);
-    halo.Exchange(Tr.ptr(), 1, ogs::Float);
-    halo.Exchange(Tn.ptr(), 1, ogs::Hlong);
+    halo.Exchange(Ts, 1);
+    halo.Exchange(Tr, 1);
+    halo.Exchange(Tn, 1);
 
     // second neighbours
     #pragma omp parallel for
@@ -215,12 +215,12 @@ void parCSR::Aggregate(dlong& Nc,
     }
 
     //share results
-    halo.Exchange(state.ptr(), 1, ogs::Int32);
+    halo.Exchange(state, 1);
 
     // if number of undecided nodes = 0, algorithm terminates
     hlong cnt = 0;
     for (dlong n=0;n<Nrows;n++) if (state[n]==0) cnt++;
-    MPI_Allreduce(MPI_IN_PLACE,&cnt,1,MPI_HLONG,MPI_SUM,comm);
+    comm.Allreduce(cnt);
 
     if (cnt==0) break;
 
@@ -239,7 +239,7 @@ void parCSR::Aggregate(dlong& Nc,
   /*Get global offsets*/
   hlong localNc=static_cast<hlong>(Nc);
   hlong NcOffsetL=0, NcOffsetU=0;
-  MPI_Scan(&localNc, &NcOffsetU, 1, MPI_HLONG, MPI_SUM, comm);
+  comm.Scan(localNc, NcOffsetU);
   NcOffsetL = NcOffsetU-Nc;
 
   /*Initialize Matching array*/
@@ -255,8 +255,8 @@ void parCSR::Aggregate(dlong& Nc,
   }
 
   //share the initial aggregate flags
-  halo.Exchange(Ts.ptr(), 1, ogs::Int32);
-  halo.Exchange(FineToCoarse.ptr(), 1, ogs::Hlong);
+  halo.Exchange(Ts, 1);
+  halo.Exchange(FineToCoarse, 1);
 
   // first neighbours
   #pragma omp parallel for
@@ -276,8 +276,8 @@ void parCSR::Aggregate(dlong& Nc,
     }
   }
 
-  halo.Exchange(Ts.ptr(), 1, ogs::Int32);
-  halo.Exchange(FineToCoarse.ptr(), 1, ogs::Hlong);
+  halo.Exchange(Ts, 1);
+  halo.Exchange(FineToCoarse, 1);
 
   // second neighbours
   #pragma omp parallel for
@@ -307,7 +307,7 @@ void parCSR::Aggregate(dlong& Nc,
   }
 
   //share results
-  halo.Exchange(FineToCoarse.ptr(), 1, ogs::Hlong);
+  halo.Exchange(FineToCoarse, 1);
 }
 
 } //namespace paradogs

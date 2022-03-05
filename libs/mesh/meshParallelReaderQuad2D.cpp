@@ -34,60 +34,46 @@ namespace libp {
 void mesh_t::ParallelReaderQuad2D(const std::string fileName){
 
   FILE *fp = fopen(fileName.c_str(), "r");
-
-  if(fp==NULL){
-    std::stringstream ss;
-    ss << "Cannot open file: " << fileName;
-    LIBP_ABORT(ss.str())
-  }
+  LIBP_ABORT("Cannot open file: " << fileName,
+             fp==NULL);
 
   char buf[BUFSIZ];
   do{
-    if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      std::stringstream ss;
-      ss << "Error reading mesh file: " << fileName;
-      LIBP_ABORT(ss.str())
-    }
+    //read to end of line
+    LIBP_ABORT("Error reading mesh file: " << fileName,
+               !fgets(buf, BUFSIZ, fp));
   }while(!strstr(buf, "$Nodes"));
 
   /* read number of nodes in mesh */
-  if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-    std::stringstream ss;
-    ss << "Error reading mesh file: " << fileName;
-    LIBP_ABORT(ss.str())
-  }
+  //read to end of line
+  LIBP_ABORT("Error reading mesh file: " << fileName,
+             !fgets(buf, BUFSIZ, fp));
   sscanf(buf, hlongFormat, &(Nnodes));
 
   /* allocate space for node coordinates */
-  libp::memory<dfloat> VX(Nnodes);
-  libp::memory<dfloat> VY(Nnodes);
+  memory<dfloat> VX(Nnodes);
+  memory<dfloat> VY(Nnodes);
 
   /* load nodes */
   for(hlong n=0;n<Nnodes;++n){
-    if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      std::stringstream ss;
-      ss << "Error reading mesh file: " << fileName;
-      LIBP_ABORT(ss.str())
-    }
+    //read to end of line
+    LIBP_ABORT("Error reading mesh file: " << fileName,
+               !fgets(buf, BUFSIZ, fp));
     sscanf(buf, "%*d" dfloatFormat dfloatFormat, VX.ptr()+n, VY.ptr()+n);
   }
 
   /* look for section with Element node data */
   do{
-    if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      std::stringstream ss;
-      ss << "Error reading mesh file: " << fileName;
-      LIBP_ABORT(ss.str())
-    }
+    //read to end of line
+    LIBP_ABORT("Error reading mesh file: " << fileName,
+               !fgets(buf, BUFSIZ, fp));
   }while(!strstr(buf, "$Elements"));
 
   /* read number of nodes in mesh */
   hlong gNelements;
-  if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-    std::stringstream ss;
-    ss << "Error reading mesh file: " << fileName;
-    LIBP_ABORT(ss.str())
-  }
+  //read to end of line
+  LIBP_ABORT("Error reading mesh file: " << fileName,
+             !fgets(buf, BUFSIZ, fp));
   sscanf(buf, hlongFormat, &gNelements);
 
   /* find # of quadrilaterals */
@@ -98,11 +84,9 @@ void mesh_t::ParallelReaderQuad2D(const std::string fileName){
 
   for(hlong n=0;n<gNelements;++n){
     int ElementType;
-    if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      std::stringstream ss;
-      ss << "Error reading mesh file: " << fileName;
-      LIBP_ABORT(ss.str())
-    }
+    //read to end of line
+    LIBP_ABORT("Error reading mesh file: " << fileName,
+               !fgets(buf, BUFSIZ, fp));
     sscanf(buf, "%*d%d", &ElementType);
     if(ElementType==1) ++gNboundaryFaces;
     if(ElementType==3) ++Nquadrilaterals;
@@ -131,11 +115,9 @@ void mesh_t::ParallelReaderQuad2D(const std::string fileName){
   for(hlong n=0;n<gNelements;++n){
     int ElementType;
     hlong v1, v2, v3, v4;
-    if (!fgets(buf, BUFSIZ, fp)) { //read to end of line
-      std::stringstream ss;
-      ss << "Error reading mesh file: " << fileName;
-      LIBP_ABORT(ss.str())
-    }
+    //read to end of line
+    LIBP_ABORT("Error reading mesh file: " << fileName,
+               !fgets(buf, BUFSIZ, fp));
     sscanf(buf, "%*d%d", &ElementType);
 
     if(ElementType==1){ // boundary face

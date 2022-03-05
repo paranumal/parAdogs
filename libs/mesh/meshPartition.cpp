@@ -48,7 +48,7 @@ void mesh_t::Partition(){
                           comm);
 
   /*Plot the resulting partition*/
-  libp::memory<dfloat> q(Nelements*Nverts);
+  memory<dfloat> q(Nelements*Nverts);
 
   for (dlong e=0;e<Nelements;e++)
     for (dlong n=0;n<Nverts;n++)

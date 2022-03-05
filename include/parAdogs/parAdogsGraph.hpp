@@ -45,8 +45,8 @@ public:
 private:
   platform_t platform;
 
-  MPI_Comm gcomm=MPI_COMM_NULL;
-  MPI_Comm comm=MPI_COMM_NULL;
+  comm_t gcomm;
+  comm_t comm;
 
   int rank, size;
   dlong Nverts=0, Nhalo=0;
@@ -72,7 +72,7 @@ private:
     hlong E[MAX_NFACES];   //Global element ids of neighbors
     int F[MAX_NFACES];     //Face ids of neighbors
   };
-  libp::memory<element_t> elements;
+  memory<element_t> elements;
 
   int faceVerts[MAX_NFACES*MAX_NFACEVERTS];
 
@@ -82,7 +82,7 @@ private:
   mgLevel_t L[MAX_LEVELS];
   coarseSolver_t coarseSolver;
 
-  libp::memory<hlong> colIds;
+  memory<hlong> colIds;
 
 public:
   /*Build a graph from mesh connectivity info*/
@@ -92,14 +92,12 @@ public:
           const int _Nverts,
           const int _Nfaces,
           const int _NfaceVerts,
-          const libp::memory<int>& faceVertices,
-          const libp::memory<hlong>& EToV,
-          const libp::memory<dfloat>& EX,
-          const libp::memory<dfloat>& EY,
-          const libp::memory<dfloat>& EZ,
-          MPI_Comm _comm);
-
-  ~graph_t();
+          const memory<int>& faceVertices,
+          const memory<hlong>& EToV,
+          const memory<dfloat>& EX,
+          const memory<dfloat>& EY,
+          const memory<dfloat>& EZ,
+          comm_t _comm);
 
   void InertialPartition();
 
@@ -112,12 +110,12 @@ public:
   void Report();
 
   void ExtractMesh(dlong &Nelements_,
-                   libp::memory<hlong>& EToV,
-                   libp::memory<hlong>& EToE,
-                   libp::memory<int>& EToF,
-                   libp::memory<dfloat>& EX,
-                   libp::memory<dfloat>& EY,
-                   libp::memory<dfloat>& EZ);
+                   memory<hlong>& EToV,
+                   memory<hlong>& EToE,
+                   memory<int>& EToF,
+                   memory<dfloat>& EX,
+                   memory<dfloat>& EY,
+                   memory<dfloat>& EZ);
 
 private:
   void InertialBipartition(const dfloat targetFraction[2]);
@@ -125,12 +123,12 @@ private:
 
 
   /*Divide graph into two pieces according to a bisection*/
-  void Split(const libp::memory<int>& partition);
+  void Split(const memory<int>& partition);
 
   void CreateLaplacian();
 
   /*Compute Fiedler vector of graph */
-  libp::memory<dfloat>& FiedlerVector();
+  memory<dfloat>& FiedlerVector();
 
   /*Improve a Fiedler vector*/
   void Refine(const int level);
@@ -138,16 +136,16 @@ private:
   /* Solve A_{l}*x = b*/
   int Solve(const int level,
             const dfloat TOL,
-            libp::memory<dfloat>& r,
-            libp::memory<dfloat>& x,
-            libp::memory<dfloat>& scratch);
+            memory<dfloat>& r,
+            memory<dfloat>& x,
+            memory<dfloat>& scratch);
 
   /*Create multilevel heirarchy*/
   void MultigridSetup();
 
   void MultigridVcycle(const int l,
-                       libp::memory<dfloat>& r,
-                       libp::memory<dfloat>& x);
+                       memory<dfloat>& r,
+                       memory<dfloat>& x);
 
   /*Clear multilevel heirarchy*/
   void MultigridDestroy();

@@ -146,7 +146,7 @@ void graph_t::CreateLaplacian() {
   }
 
   //fill the halo region
-  A.halo.Exchange(A.diagA.ptr(), 1, ogs::Dfloat);
+  A.halo.Exchange(A.diagA, 1);
 
   L[0].Nrows = A.Nrows;
   L[0].Ncols = A.Ncols;

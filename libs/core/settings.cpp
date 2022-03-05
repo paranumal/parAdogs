@@ -66,7 +66,7 @@ void setting_t::updateVal(const string newVal){
        << "Possible values are: { ";
     for (size_t i=0;i<options.size()-1;i++) ss << options[i] << ", ";
     ss << options[options.size()-1] << " }" << std::endl;
-    LIBP_ABORT(ss.str());
+    LIBP_FORCE_ABORT(ss.str());
   }
 }
 
@@ -97,7 +97,7 @@ std::ostream& operator<<(std::ostream& os, const setting_t& setting) {
   return os;
 }
 
-settings_t::settings_t(MPI_Comm _comm):
+settings_t::settings_t(comm_t _comm):
   comm(_comm) {}
 
 void settings_t::newSetting(const string name, const string val,
@@ -108,9 +108,7 @@ void settings_t::newSetting(const string name, const string val,
     settings[name] = setting_t(name, val, description, options);
     insertOrder.push_back(name);
   } else {
-    stringstream ss;
-    ss << "Setting with name: [" << name << "] already exists.";
-    LIBP_ABORT(ss.str());
+    LIBP_FORCE_ABORT("Setting with name: [" << name << "] already exists.");
   }
 }
 
@@ -128,9 +126,7 @@ void settings_t::changeSetting(const string name, const string newVal) {
     setting_t& val = search->second;
     val.updateVal(newVal);
   } else {
-    stringstream ss;
-    ss << "Setting with name: [" << name << "] does not exist.";
-    LIBP_ABORT(ss.str());
+    LIBP_FORCE_ABORT("Setting with name: [" << name << "] does not exist.");
   }
 }
 
@@ -139,17 +135,13 @@ void settings_t::readSettingsFromFile(string filename) {
   string line;
   std::ifstream file;
 
-  int rank;
-  MPI_Comm_rank(comm, &rank);
+  int rank = comm.rank();
 
   //only the root rank performs the read
   if (!rank) {
     file.open(filename);
-    if (!file.is_open()) {
-      stringstream ss;
-      ss << "Failed to open: " << filename.c_str();
-      LIBP_ABORT(ss.str());
-    }
+    LIBP_ABORT("Failed to open: " << filename.c_str(),
+               !file.is_open());
   }
 
   string name = "";
@@ -159,23 +151,26 @@ void settings_t::readSettingsFromFile(string filename) {
   int flag;
 
   if (!rank)
-   flag = (getline(file,line)) ? 1 : 0;
+    flag = (getline(file,line)) ? 1 : 0;
 
-  MPI_Bcast(&flag, 1, MPI_INT, 0, comm);
+  comm.Bcast(flag, 0);
+
+  int MaxLineSize=512;
+  memory<char> cline;
+  cline.calloc(MaxLineSize+1);
 
   while (flag) {
     int size;
-    char *cline;
 
     if (!rank) {
       size = line.length();
+      LIBP_ABORT("Line in settings file is too long: " << line,
+                 size>MaxLineSize);
     }
-    MPI_Bcast(&size, 1, MPI_INT, 0, comm);
+    comm.Bcast(size, 0);
 
-    cline = (char*) calloc(size+1,sizeof(char));
-    if (!rank) strcpy(cline, line.c_str());
-
-    MPI_Bcast(cline, size, MPI_CHAR, 0, comm);
+    if (!rank) strcpy(cline.ptr(), line.c_str());
+    comm.Bcast(cline, 0, size);
 
     for(int i=0; i<size; i++){
       char c = cline[i];
@@ -202,7 +197,6 @@ void settings_t::readSettingsFromFile(string filename) {
         val += c;
       }
     }
-    if (cline) free(cline);
 
     if (name.length() && val.length()) {
       newSetting(name, val);
@@ -212,7 +206,7 @@ void settings_t::readSettingsFromFile(string filename) {
     if (!rank)
       flag = (getline(file,line)) ? 1 : 0;
 
-    MPI_Bcast(&flag, 1, MPI_INT, 0, comm);
+    comm.Bcast(flag, 0);
   }
 
   if (!rank)
@@ -225,9 +219,7 @@ string settings_t::getSetting(const string name) const {
     const setting_t& val = search->second;
     return val.getVal<string>();
   } else {
-    stringstream ss;
-    ss << "Unable to find setting: [" << name << "]";
-    LIBP_ABORT(ss.str());
+    LIBP_FORCE_ABORT("Unable to find setting: [" << name << "]");
     return string();
   }
 }
@@ -238,9 +230,7 @@ bool settings_t::compareSetting(const string name, const string token) const {
     const setting_t& val = search->second;
     return val.compareVal(token);
   } else {
-    stringstream ss;
-    ss << "Unable to find setting: [" << name.c_str() << "]";
-    LIBP_ABORT(ss.str());
+    LIBP_FORCE_ABORT("Unable to find setting: [" << name.c_str() << "]");
     return false;
   }
 }
@@ -260,9 +250,7 @@ void settings_t::reportSetting(const string name) const {
     const setting_t& val = search->second;
     std::cout << val << std::endl;
   } else {
-    stringstream ss;
-    ss << "Unable to find setting: [" << name.c_str() << "]";
-    LIBP_ABORT(ss.str());
+    LIBP_FORCE_ABORT("Unable to find setting: [" << name.c_str() << "]");
   }
 }
 

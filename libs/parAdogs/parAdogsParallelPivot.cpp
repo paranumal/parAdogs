@@ -41,13 +41,13 @@ namespace libp {
 
 namespace paradogs {
 
-static dfloat Pivot(libp::memory<dfloat>& A,
+static dfloat Pivot(memory<dfloat>& A,
                     const dlong left,
                     const dlong right,
                     const hlong k,
                     const dfloat min,
                     const dfloat max,
-                    MPI_Comm comm) {
+                    comm_t comm) {
   /*Start with guessing a pivot halfway between min and max*/
   const dfloat pivot = (min+max)/2.0;
 
@@ -59,7 +59,7 @@ static dfloat Pivot(libp::memory<dfloat>& A,
   /*Get how many entries are globally <= pivot*/
   hlong localCnt = Am-A.ptr();
   hlong globalCnt = localCnt;
-  MPI_Allreduce(&localCnt, &globalCnt, 1, MPI_HLONG, MPI_SUM, comm);
+  comm.Allreduce(globalCnt);
 
   if (globalCnt==k) return pivot;
 
@@ -72,11 +72,11 @@ static dfloat Pivot(libp::memory<dfloat>& A,
 
 /* Given a distributed vector F in comm, find a pivot value,
    such that there are globally k entries of F which are <= pivot. */
-dfloat ParallelPivot(const dlong N, libp::memory<dfloat>& F,
-                     const hlong k, MPI_Comm comm) {
+dfloat ParallelPivot(const dlong N, memory<dfloat>& F,
+                     const hlong k, comm_t comm) {
 
   /*Make a copy of input vector*/
-  libp::memory<dfloat> A(N);
+  memory<dfloat> A(N);
   
   #pragma omp parallel for
   for (dlong n=0;n<N;++n) {
@@ -84,16 +84,14 @@ dfloat ParallelPivot(const dlong N, libp::memory<dfloat>& F,
   }
 
   /*Find global minimum/maximum*/
-  dfloat localMin=std::numeric_limits<dfloat>::max();
-  dfloat localMax=std::numeric_limits<dfloat>::min();
+  dfloat globalMin=std::numeric_limits<dfloat>::max();
+  dfloat globalMax=std::numeric_limits<dfloat>::min();
   for (dlong n=0;n<N;++n) {
-    localMax = std::max(A[n], localMax);
-    localMin = std::min(A[n], localMin);
+    globalMax = std::max(A[n], globalMax);
+    globalMin = std::min(A[n], globalMin);
   }
-  dfloat globalMin=localMin;
-  dfloat globalMax=localMax;
-  MPI_Allreduce(&localMin, &globalMin, 1, MPI_DFLOAT, MPI_MIN, comm);
-  MPI_Allreduce(&localMax, &globalMax, 1, MPI_DFLOAT, MPI_MAX, comm);
+  comm.Allreduce(globalMin, comm_t::Min);
+  comm.Allreduce(globalMax, comm_t::Max);
 
   /*Find pivot point via binary search*/
   dfloat pivot = Pivot(A, 0, N, k, globalMin, globalMax, comm);

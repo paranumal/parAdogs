@@ -34,16 +34,16 @@ namespace paradogs {
 parCSR TentativeProlongator(const dlong Nf,
                             const dlong Nc,
                             platform_t& platform,
-                            MPI_Comm comm,
-                            libp::memory<hlong>& FineToCoarse,
-                            libp::memory<dfloat>& FineNull,
-                            libp::memory<dfloat>& CoarseNull) {
+                            comm_t comm,
+                            memory<hlong>& FineToCoarse,
+                            memory<dfloat>& FineNull,
+                            memory<dfloat>& CoarseNull) {
   dlong nnz = Nf;
-  libp::memory<nonZero_t> entries(nnz);
+  memory<nonZero_t> entries(nnz);
 
   hlong localNf=static_cast<hlong>(Nf);
   hlong NfOffsetL=0, NfOffsetU=0;
-  MPI_Scan(&localNf, &NfOffsetU, 1, MPI_HLONG, MPI_SUM, comm);
+  comm.Scan(localNf, NfOffsetU);
   NfOffsetL = NfOffsetU-Nf;
 
   /* Each entry is the CoarseNull vector entry*/
@@ -76,14 +76,14 @@ parCSR TentativeProlongator(const dlong Nf,
     CoarseNull[T.offd.cols[n]] += T.offd.vals[n] * T.offd.vals[n];
 
   //add the halo values to their origins
-  T.halo.Combine(CoarseNull.ptr(), 1, ogs::Dfloat);
+  T.halo.Combine(CoarseNull, 1);
 
   #pragma omp parallel for
   for (dlong n=0;n<Nc;++n)
     CoarseNull[n] = sqrt(CoarseNull[n]);
 
   //share the results
-  T.halo.Exchange(CoarseNull.ptr(), 1, ogs::Dfloat);
+  T.halo.Exchange(CoarseNull, 1);
 
   #pragma omp parallel for
   for (dlong n=0;n<T.diag.nnz;++n)

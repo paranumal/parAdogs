@@ -29,7 +29,7 @@ SOFTWARE.
 
 namespace libp {
 
-meshSettings_t::meshSettings_t(MPI_Comm& _comm):
+meshSettings_t::meshSettings_t(comm_t _comm):
   settings_t(_comm) {
 
   newSetting("MESH FILE",
@@ -92,10 +92,7 @@ meshSettings_t::meshSettings_t(MPI_Comm& _comm):
 
 void meshSettings_t::report() {
 
-  int rank;
-  MPI_Comm_rank(comm, &rank);
-
-  if (rank==0) {
+  if (comm.rank()==0) {
     std::cout << "Mesh Settings:\n\n";
     if (!compareSetting("MESH FILE","BOX"))
       reportSetting("MESH FILE");

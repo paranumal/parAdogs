@@ -38,11 +38,11 @@ namespace paradogs {
 void graph_t::Refine(const int level) {
 
   parCSR& A = L[level].A;
-  libp::memory<dfloat>& null = L[level].null;
+  memory<dfloat>& null = L[level].null;
   const dlong N = L[level].Nrows;
   const dlong Ncols = L[level].Ncols;
 
-  libp::memory<dfloat>& Fiedler = L[level].Fiedler;
+  memory<dfloat>& Fiedler = L[level].Fiedler;
 
   /*******************************************************/
   /*Improve fine Fiedler vector via Inverse Iteration    */
@@ -53,9 +53,9 @@ void graph_t::Refine(const int level) {
 
   const int maxIters=1;
 
-  libp::memory<dfloat> x(Ncols);
-  libp::memory<dfloat> scratch(3*Ncols);
-  libp::memory<dfloat> AF = scratch;
+  memory<dfloat> x(Ncols);
+  memory<dfloat> scratch(3*Ncols);
+  memory<dfloat> AF = scratch;
 
   /*AF = A*F*/
   A.SpMV(1.0, Fiedler, 0.0, AF);
@@ -67,8 +67,8 @@ void graph_t::Refine(const int level) {
     theta += Fiedler[n]*AF[n];
     normAF += AF[n]*AF[n];
   }
-  MPI_Allreduce(MPI_IN_PLACE, &theta, 1, MPI_DFLOAT, MPI_SUM, comm);
-  MPI_Allreduce(MPI_IN_PLACE, &normAF, 1, MPI_DFLOAT, MPI_SUM, comm);
+  comm.Allreduce(theta);
+  comm.Allreduce(normAF);
 
   dfloat err = sqrt(std::abs(normAF - theta*theta))/theta;
 
@@ -97,7 +97,7 @@ void graph_t::Refine(const int level) {
     for (int n=0;n<N;++n) {
       dot += x[n]*null[n];
     }
-    MPI_Allreduce(MPI_IN_PLACE, &dot, 1, MPI_DFLOAT, MPI_SUM, comm);
+    comm.Allreduce(dot);
 
     #pragma omp parallel for
     for (int n=0;n<N;++n) {
@@ -108,7 +108,7 @@ void graph_t::Refine(const int level) {
     for (dlong n=0;n<N;++n) {
       normx += x[n]*x[n];
     }
-    MPI_Allreduce(MPI_IN_PLACE, &normx, 1, MPI_DFLOAT, MPI_SUM, comm);
+    comm.Allreduce(normx);
     normx = sqrt(normx);
 
     /*F = x /||x||*/
@@ -127,8 +127,8 @@ void graph_t::Refine(const int level) {
       theta += Fiedler[n]*AF[n];
       normAF += AF[n]*AF[n];
     }
-    MPI_Allreduce(MPI_IN_PLACE, &theta, 1, MPI_DFLOAT, MPI_SUM, comm);
-    MPI_Allreduce(MPI_IN_PLACE, &normAF, 1, MPI_DFLOAT, MPI_SUM, comm);
+    comm.Allreduce(theta);
+    comm.Allreduce(normAF);
 
     err = sqrt(std::abs(normAF - theta*theta))/theta;
 

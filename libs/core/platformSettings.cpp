@@ -28,7 +28,7 @@ SOFTWARE.
 
 namespace libp {
 
-platformSettings_t::platformSettings_t(MPI_Comm _comm):
+platformSettings_t::platformSettings_t(comm_t _comm):
   settings_t(_comm) {
 
   //settings format
@@ -57,10 +57,7 @@ platformSettings_t::platformSettings_t(MPI_Comm _comm):
 
 void platformSettings_t::report() {
 
-  int rank;
-  MPI_Comm_rank(comm, &rank);
-
-  if (rank==0) {
+  if (comm.rank()==0) {
     std::cout << "OCCA Settings:\n\n";
 
     reportSetting("THREAD MODEL");
@@ -68,9 +65,7 @@ void platformSettings_t::report() {
     if (compareSetting("THREAD MODEL","OpenCL"))
       reportSetting("PLATFORM NUMBER");
 
-    int size;
-    MPI_Comm_size(comm, &size);
-    if ((size==1)
+    if ((comm.size()==1)
         &&(compareSetting("THREAD MODEL","CUDA")
         ||compareSetting("THREAD MODEL","HIP")
         ||compareSetting("THREAD MODEL","OpenCL") ))

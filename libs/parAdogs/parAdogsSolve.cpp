@@ -37,17 +37,17 @@ namespace paradogs {
 /****************************************/
 int graph_t::Solve(const int level, 
                    const dfloat TOL,
-                   libp::memory<dfloat>& r,
-                   libp::memory<dfloat>& x,
-                   libp::memory<dfloat>& scratch) {
+                   memory<dfloat>& r,
+                   memory<dfloat>& x,
+                   memory<dfloat>& scratch) {
 
   parCSR& A = L[level].A;
   const dlong N = A.Nrows;
   const dlong Ncols = L[level].Ncols;
 
-  libp::memory<dfloat> p  = scratch + 0*Ncols;
-  libp::memory<dfloat> Ap = scratch + 1*Ncols;
-  libp::memory<dfloat> z  = scratch + 2*Ncols;
+  memory<dfloat> p  = scratch + 0*Ncols;
+  memory<dfloat> Ap = scratch + 1*Ncols;
+  memory<dfloat> z  = scratch + 2*Ncols;
 
   // register scalars
   dfloat rdotz1 = 0.0;
@@ -78,7 +78,7 @@ int graph_t::Solve(const int level,
     for (dlong n=0;n<N;++n) {
       rdotz1 += z[n]*r[n];
     }
-    MPI_Allreduce(MPI_IN_PLACE, &rdotz1, 1, MPI_DFLOAT, MPI_SUM, comm);
+    comm.Allreduce(rdotz1);
 
     beta = (cg_iter==0) ? 0.0 : rdotz1/rdotz2;
 
@@ -103,7 +103,7 @@ int graph_t::Solve(const int level,
     for (dlong n=0;n<N;++n) {
       pAp += p[n]*Ap[n];
     }
-    MPI_Allreduce(MPI_IN_PLACE, &pAp, 1, MPI_DFLOAT, MPI_SUM, comm);
+    comm.Allreduce(pAp);
 
     alpha = rdotz1/pAp;
 
@@ -116,7 +116,7 @@ int graph_t::Solve(const int level,
       r[n] = r[n] - alpha*Ap[n];
       rdotr += r[n]*r[n];
     }
-    MPI_Allreduce(MPI_IN_PLACE, &rdotr, 1, MPI_DFLOAT, MPI_SUM, comm);
+    comm.Allreduce(rdotr);
 
     if(rdotr<0) printf("WARNING CG: rdotr = %17.15lf\n", rdotr);
 

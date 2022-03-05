@@ -154,9 +154,7 @@ void mesh_t::SetElementType(const int eType) {
     plotEToV[5*plotNverts+2] = 5;
     plotEToV[5*plotNverts+3] = 6;
   } else {
-    std::stringstream ss;
-    ss << "Unknown element type: " << eType;
-    LIBP_ABORT(ss.str())
+    LIBP_FORCE_ABORT("Unknown element type: " << eType);
   }
 }
 

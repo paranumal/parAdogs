@@ -29,7 +29,7 @@ SOFTWARE.
 namespace libp {
 
 //plot field at vertices
-void mesh_t::Plot(const libp::memory<dfloat>& q){
+void mesh_t::Plot(const memory<dfloat> q){
 
   FILE *fp;
 

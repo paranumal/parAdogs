@@ -40,16 +40,16 @@ namespace libp {
 
 class platformSettings_t: public settings_t {
 public:
-  platformSettings_t(MPI_Comm _comm);
+  platformSettings_t(comm_t _comm);
   void report();
 };
 
 namespace internal {
 
 class iplatform_t {
-public:
+ public:
   platformSettings_t& settings;
-  occa::properties props;
+  properties_t props;
 
   iplatform_t(platformSettings_t& _settings):
     settings(_settings) {
@@ -60,13 +60,12 @@ public:
 
 
 class platform_t {
-public:
-  MPI_Comm comm = MPI_COMM_NULL;
+ private:
   std::shared_ptr<internal::iplatform_t> iplatform;
 
-  occa::device device;
-
-  int rank=0, size=0;
+ public:
+  comm_t comm;
+  device_t device;
 
   platform_t()=default;
 
@@ -76,10 +75,7 @@ public:
 
     comm = settings.comm;
 
-    MPI_Comm_rank(comm, &rank);
-    MPI_Comm_size(comm, &size);
-
-    if (rank==0) {
+    if (rank()==0) {
       std::cout << "\n";
       std::cout << "\033[1m";
       std::cout << " _ _ _     ____                                             _ \n";
@@ -102,69 +98,63 @@ public:
   platform_t(const platform_t &other)=default;
   platform_t& operator = (const platform_t &other)=default;
 
-  bool isInitialized() {
+  bool isInitialized() const {
     return (iplatform!=nullptr);
   }
 
-  void assertInitialized() {
-    if(!isInitialized()) {
-      LIBP_ABORT("Platform not initialized.");
-    }
+  void assertInitialized() const {
+    LIBP_ABORT("Platform not initialized.",
+               !isInitialized());
   }
 
-  occa::kernel buildKernel(std::string fileName, std::string kernelName,
-                           occa::properties& kernelInfo);
+  kernel_t buildKernel(std::string fileName, std::string kernelName,
+                       properties_t& kernelInfo);
 
-  occa::memory malloc(const size_t bytes,
-                      const void *src = NULL,
-                      const occa::properties &prop = occa::properties()) {
+  template <typename T>
+  deviceMemory<T> malloc(const size_t count,
+                         const properties_t &prop = properties_t()) {
     assertInitialized();
-    return device.malloc(bytes, src, prop);
-  }
-
-  occa::memory malloc(const size_t bytes,
-                      const occa::memory &src,
-                      const occa::properties &prop = occa::properties()) {
-    assertInitialized();
-    return device.malloc(bytes, src, prop);
-  }
-
-  occa::memory malloc(const size_t bytes,
-                      const occa::properties &prop) {
-    assertInitialized();
-    return device.malloc(bytes, prop);
+    return deviceMemory<T>(device.malloc<T>(count, prop));
   }
 
   template <typename T>
-  occa::memory malloc(const size_t count,
-                      const occa::properties &prop = occa::properties()) {
+  deviceMemory<T> malloc(const size_t count,
+                         const memory<T> src,
+                         const properties_t &prop = properties_t()) {
     assertInitialized();
-    return device.malloc(count*sizeof(T), prop);
+    return deviceMemory<T>(device.malloc<T>(count, src.ptr(), prop));
   }
 
   template <typename T>
-  occa::memory malloc(const size_t count,
-                      const libp::memory<T> &src,
-                      const occa::properties &prop) {
+  deviceMemory<T> malloc(const memory<T> src,
+                         const properties_t &prop = properties_t()) {
     assertInitialized();
-    return device.malloc(count*sizeof(T), src.ptr(), prop);
+    return deviceMemory<T>(device.malloc<T>(src.length(), src.ptr(), prop));
   }
 
   template <typename T>
-  occa::memory malloc(const libp::memory<T> &src,
-                      const occa::properties &prop = occa::properties()) {
+  pinnedMemory<T> hostMalloc(const size_t count){
     assertInitialized();
-    return device.malloc(src.length()*sizeof(T), src.ptr(), prop);
-  }
-
-  void *hostMalloc(const size_t bytes,
-                   const void *src,
-                   occa::memory &h_mem){
-    assertInitialized();
-    occa::properties hostProp;
+    properties_t hostProp;
     hostProp["host"] = true;
-    h_mem = device.malloc(bytes, src, hostProp);
-    return h_mem.ptr();
+    return pinnedMemory<T>(device.malloc<T>(count, nullptr, hostProp));
+  }
+
+  template <typename T>
+  pinnedMemory<T> hostMalloc(const size_t count,
+                             const memory<T> src){
+    assertInitialized();
+    properties_t hostProp;
+    hostProp["host"] = true;
+    return pinnedMemory<T>(device.malloc<T>(count, src.ptr(), hostProp));
+  }
+
+  template <typename T>
+  pinnedMemory<T> hostMalloc(const memory<T> src){
+    assertInitialized();
+    properties_t hostProp;
+    hostProp["host"] = true;
+    return pinnedMemory<T>(device.malloc<T>(src.length(), src.ptr(), hostProp));
   }
 
   settings_t& settings() {
@@ -172,15 +162,26 @@ public:
     return iplatform->settings;
   }
 
-  occa::properties& props() {
+  properties_t& props() {
     assertInitialized();
     return iplatform->props;
   }
 
-private:
+  void finish() {
+    device.finish();
+  }
+
+  const int rank() const {
+    return comm.rank();
+  }
+
+  const int size() const {
+    return comm.size();
+  }
+
+ private:
   void DeviceConfig();
   void DeviceProperties();
-
 };
 
 } //namespace libp

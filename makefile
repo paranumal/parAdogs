@@ -87,7 +87,7 @@ DEFINES =${LIBP_DEFINES} \
          -DLIBP_DIR='"${LIBP_DIR}"'
 
 #.cpp compilation flags
-PARADOGS_CXXFLAGS=${LIBP_MPICXXFLAGS} ${DEFINES} ${INCLUDES}
+PARADOGS_CXXFLAGS=${LIBP_CXXFLAGS} ${DEFINES} ${INCLUDES}
 
 #link libraries
 LIBS=-L${LIBP_LIBS_DIR} $(addprefix -l,$(PARADOGS_LIBP_LIBS)) \
@@ -128,10 +128,10 @@ endif
 # rule for .cpp files
 %.o: %.cpp $(DEPS) | libp_libs
 ifneq (,${verbose})
-	$(LIBP_MPICXX) -o $*.o -c $*.cpp $(PARADOGS_CXXFLAGS)
+	$(LIBP_CXX) -o $*.o -c $*.cpp $(PARADOGS_CXXFLAGS)
 else
 	@printf "%b" "$(OBJ_COLOR)Compiling $(@F)$(NO_COLOR)\n";
-	@$(LIBP_MPICXX) -o $*.o -c $*.cpp $(PARADOGS_CXXFLAGS)
+	@$(LIBP_CXX) -o $*.o -c $*.cpp $(PARADOGS_CXXFLAGS)
 endif
 
 #cleanup

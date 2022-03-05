@@ -35,7 +35,7 @@ namespace libp {
 
 class meshSettings_t: public settings_t {
 public:
-  meshSettings_t(MPI_Comm& _comm);
+  meshSettings_t(comm_t _comm);
   void report();
 };
 
@@ -45,7 +45,7 @@ public:
   settings_t settings;
   occa::properties props;
 
-  MPI_Comm comm;
+  comm_t comm;
   int rank, size;
 
   /*************************/
@@ -56,40 +56,40 @@ public:
   int elementType;
 
   // indices of vertex nodes
-  libp::memory<int> vertexNodes;
+  memory<int> vertexNodes;
 
   hlong Nnodes=0; //global number of element vertices
-  libp::memory<dfloat> EX; // coordinates of vertices for each element
-  libp::memory<dfloat> EY;
-  libp::memory<dfloat> EZ;
+  memory<dfloat> EX; // coordinates of vertices for each element
+  memory<dfloat> EY;
+  memory<dfloat> EZ;
 
   dlong Nelements=0;       //local element count
   hlong NelementsGlobal=0; //global element count
-  libp::memory<hlong> EToV; // element-to-vertex connectivity
-  libp::memory<hlong> EToE; // element-to-element connectivity
-  libp::memory<int>   EToF; // element-to-(local)face connectivity
-  libp::memory<int>   EToP; // element-to-partition/process connectivity
-  libp::memory<int>   EToB; // element-to-boundary condition type
+  memory<hlong> EToV; // element-to-vertex connectivity
+  memory<hlong> EToE; // element-to-element connectivity
+  memory<int>   EToF; // element-to-(local)face connectivity
+  memory<int>   EToP; // element-to-partition/process connectivity
+  memory<int>   EToB; // element-to-boundary condition type
 
-  libp::memory<hlong> elementInfo; //type of element
+  memory<hlong> elementInfo; //type of element
 
-  libp::memory<dlong> VmapM;  // list of vertices on each face
-  libp::memory<dlong> VmapP;  // list of vertices that are paired with face vertices
+  memory<dlong> VmapM;  // list of vertices on each face
+  memory<dlong> VmapP;  // list of vertices that are paired with face vertices
 
-  libp::memory<int> faceVertices; // list of mesh vertices on each face
+  memory<int> faceVertices; // list of mesh vertices on each face
 
   // boundary faces
   hlong NboundaryFaces=0; // number of boundary faces
-  libp::memory<hlong> boundaryInfo; // list of boundary faces (type, vertex-1, vertex-2, vertex-3)
+  memory<hlong> boundaryInfo; // list of boundary faces (type, vertex-1, vertex-2, vertex-3)
 
   int plotNverts=0;            // number of vertices for each plot element
   int plotNelements=0;         // number of "plot elements" per element
-  libp::memory<int> plotEToV;  // triangulation of plot nodes
+  memory<int> plotEToV;  // triangulation of plot nodes
 
   mesh_t()=default;
   mesh_t(platform_t& _platform,
          meshSettings_t& _settings,
-         MPI_Comm _comm) {
+         comm_t _comm) {
     Setup(_platform, _settings, _comm);
   }
 
@@ -97,7 +97,7 @@ public:
 
   void Setup(platform_t& _platform,
              meshSettings_t& _settings,
-             MPI_Comm _comm);
+             comm_t _comm);
 
 private:
   /*Element types*/
@@ -156,7 +156,7 @@ private:
   // repartition elements
   void Partition();
 
-  void Plot(const libp::memory<dfloat>& q);
+  void Plot(const memory<dfloat> q);
 };
 
 } //namespace libp

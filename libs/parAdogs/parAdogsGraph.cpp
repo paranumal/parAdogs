@@ -38,12 +38,12 @@ graph_t::graph_t(platform_t &_platform,
                  const int _Nverts,
                  const int _Nfaces,
                  const int _NfaceVerts,
-                 const libp::memory<int>& faceVertices,
-                 const libp::memory<hlong>& EToV,
-                 const libp::memory<dfloat>& EX,
-                 const libp::memory<dfloat>& EY,
-                 const libp::memory<dfloat>& EZ,
-                 MPI_Comm _comm):
+                 const memory<int>& faceVertices,
+                 const memory<hlong>& EToV,
+                 const memory<dfloat>& EX,
+                 const memory<dfloat>& EY,
+                 const memory<dfloat>& EZ,
+                 comm_t _comm):
   platform(_platform),
   Nverts(_Nelements),
   Nelements(_Nelements),
@@ -52,23 +52,24 @@ graph_t::graph_t(platform_t &_platform,
   NelementVerts(_Nverts),
   NfaceVerts(_NfaceVerts) {
 
-  MPI_Comm_dup(_comm, &gcomm);
-  MPI_Comm_rank(gcomm, &grank);
-  MPI_Comm_size(gcomm, &gsize);
+  gcomm = _comm.Dup();
+  grank = gcomm.rank();
+  gsize = gcomm.size();
 
-  MPI_Comm_dup(_comm, &comm);
-  MPI_Comm_rank(comm, &rank);
-  MPI_Comm_size(comm, &size);
+  comm  = _comm.Dup();
+  rank = comm.rank();
+  size = comm.size();
 
   for (int n=0;n<Nfaces*NfaceVerts;++n)
     faceVerts[n] = faceVertices[n];
 
   /*Global number of elements*/
-  hlong localNverts=static_cast<hlong>(Nverts);
-  MPI_Allreduce(&localNverts, &NVertsGlobal, 1, MPI_HLONG, MPI_SUM, comm);
+  NVertsGlobal=static_cast<hlong>(Nverts);
+  comm.Allreduce(NVertsGlobal);
 
   /*Get global element count offsets*/
-  MPI_Scan(&localNverts, &VoffsetU, 1, MPI_HLONG, MPI_SUM, comm);
+  hlong localNverts=static_cast<hlong>(Nverts);
+  comm.Scan(localNverts, VoffsetU);
   VoffsetL = VoffsetU-Nverts;
 
   gNVertsGlobal = NVertsGlobal;
@@ -109,7 +110,7 @@ graph_t::graph_t(platform_t &_platform,
 }
 
 /*Globally divide graph into two pieces according to a bipartition*/
-void graph_t::Split(const libp::memory<int>& partition) {
+void graph_t::Split(const memory<int>& partition) {
 
   /*Count how much of each partition we have locally*/
   dlong Nverts0=0;
@@ -119,20 +120,20 @@ void graph_t::Split(const libp::memory<int>& partition) {
     else                 Nverts1++;
   }
 
-  hlong localNverts0 = static_cast<hlong>(Nverts0);
-  hlong localNverts1 = static_cast<hlong>(Nverts1);
-  hlong globalNverts0=0;
-  hlong globalNverts1=0;
-  MPI_Allreduce(&localNverts0, &globalNverts0, 1, MPI_HLONG, MPI_SUM, comm);
-  MPI_Allreduce(&localNverts1, &globalNverts1, 1, MPI_HLONG, MPI_SUM, comm);
+  hlong globalNverts0=static_cast<hlong>(Nverts0);
+  hlong globalNverts1=static_cast<hlong>(Nverts1);
+  comm.Allreduce(globalNverts0);
+  comm.Allreduce(globalNverts1);
 
   /*Get offsets of partitions on each rank*/
-  libp::memory<hlong> starts0(size+1);
-  libp::memory<hlong> starts1(size+1);
+  memory<hlong> starts0(size+1);
+  memory<hlong> starts1(size+1);
   starts0[0]=0;
   starts1[0]=0;
-  MPI_Allgather(&localNverts0, 1, MPI_HLONG, starts0.ptr()+1, 1,  MPI_HLONG, comm);
-  MPI_Allgather(&localNverts1, 1, MPI_HLONG, starts1.ptr()+1, 1,  MPI_HLONG, comm);
+  hlong localNverts0 = static_cast<hlong>(Nverts0);
+  hlong localNverts1 = static_cast<hlong>(Nverts1);
+  comm.Allgather(localNverts0, starts0+1);
+  comm.Allgather(localNverts1, starts1+1);
 
   for(int r=0;r<size;++r) {
     starts0[r+1] += starts0[r];
@@ -149,38 +150,16 @@ void graph_t::Split(const libp::memory<int>& partition) {
   const int remainder0 = static_cast<int>(globalNverts0 - chunk0*size0);
   const int remainder1 = static_cast<int>(globalNverts1 - chunk1*size1);
 
-  // Make the MPI_ELEMENT_T data type
-  MPI_Datatype MPI_ELEMENT_T;
-  MPI_Datatype dtype[6] = {MPI_DFLOAT, MPI_DFLOAT, MPI_DFLOAT,
-                           MPI_HLONG, MPI_HLONG, MPI_INT};
-  int blength[6] = {MAX_NVERTS, MAX_NVERTS, MAX_NVERTS,
-                    MAX_NVERTS, MAX_NFACES, MAX_NFACES};
-  MPI_Aint addr[6], displ[6];
-  MPI_Get_address ( &(elements[0]      ), addr+0);
-  MPI_Get_address ( &(elements[0].EY[0]), addr+1);
-  MPI_Get_address ( &(elements[0].EZ[0]), addr+2);
-  MPI_Get_address ( &(elements[0].V[0] ), addr+3);
-  MPI_Get_address ( &(elements[0].E[0] ), addr+4);
-  MPI_Get_address ( &(elements[0].F[0] ), addr+5);
-  displ[0] = 0;
-  displ[1] = addr[1] - addr[0];
-  displ[2] = addr[2] - addr[0];
-  displ[3] = addr[3] - addr[0];
-  displ[4] = addr[4] - addr[0];
-  displ[5] = addr[5] - addr[0];
-  MPI_Type_create_struct (6, blength, displ, dtype, &MPI_ELEMENT_T);
-  MPI_Type_commit (&MPI_ELEMENT_T);
+  memory<int> Nsend0(size,0);
+  memory<int> Nsend1(size,0);
+  memory<int> Nrecv0(size);
+  memory<int> Nrecv1(size);
+  memory<int> sendOffsets0(size);
+  memory<int> sendOffsets1(size);
+  memory<int> recvOffsets0(size);
+  memory<int> recvOffsets1(size);
 
-  libp::memory<int> Nsend0(size,0);
-  libp::memory<int> Nsend1(size,0);
-  libp::memory<int> Nrecv0(size);
-  libp::memory<int> Nrecv1(size);
-  libp::memory<int> sendOffsets0(size);
-  libp::memory<int> sendOffsets1(size);
-  libp::memory<int> recvOffsets0(size);
-  libp::memory<int> recvOffsets1(size);
-
-  libp::memory<hlong> newIds(Nverts+Nhalo);
+  memory<hlong> newIds(Nverts+Nhalo);
 
   /*Determine new ids and send counts*/
   dlong cnt0=0;
@@ -220,7 +199,7 @@ void graph_t::Split(const libp::memory<int>& partition) {
 
   if (L[0].Nglobal) {
     /*If we have connected the elements, share the newIds*/
-    L[0].A.halo.Exchange(newIds.ptr(), 1, ogs::Hlong);
+    L[0].A.halo.Exchange(newIds, 1);
 
     /*Then update the connectivity*/
     dlong cnt=0;
@@ -263,8 +242,8 @@ void graph_t::Split(const libp::memory<int>& partition) {
   }
 
   // exchange counts
-  MPI_Alltoall(Nsend0.ptr(), 1, MPI_INT, Nrecv0.ptr(), 1, MPI_INT, comm);
-  MPI_Alltoall(Nsend1.ptr(), 1, MPI_INT, Nrecv1.ptr(), 1, MPI_INT, comm);
+  comm.Alltoall(Nsend0, Nrecv0);
+  comm.Alltoall(Nsend1, Nrecv1);
 
   // find recv offsets
   recvOffsets0[0]=0;
@@ -288,8 +267,8 @@ void graph_t::Split(const libp::memory<int>& partition) {
   }
 
   /*make send buffers*/
-  libp::memory<element_t> sendElements0(NsendTotal0);
-  libp::memory<element_t> sendElements1(NsendTotal1);
+  memory<element_t> sendElements0(NsendTotal0);
+  memory<element_t> sendElements1(NsendTotal1);
 
   cnt0=0;
   cnt1=0;
@@ -306,36 +285,35 @@ void graph_t::Split(const libp::memory<int>& partition) {
   Nelements = newNverts;
   elements.malloc(Nverts);
 
+  memory<element_t> null;
+
   // exchange elements
   if (rank<size0) {
-    MPI_Alltoallv(sendElements0.ptr(), Nsend0.ptr(), sendOffsets0.ptr(), MPI_ELEMENT_T,
-                  elements.ptr(), Nrecv0.ptr(), recvOffsets0.ptr(), MPI_ELEMENT_T, comm);
-    MPI_Alltoallv(sendElements1.ptr(), Nsend1.ptr(), sendOffsets1.ptr(), MPI_ELEMENT_T,
-                  NULL, Nrecv1.ptr(), recvOffsets1.ptr(), MPI_ELEMENT_T, comm);
+    comm.Alltoallv(sendElements0, Nsend0, sendOffsets0,
+                        elements, Nrecv0, recvOffsets0);
+    comm.Alltoallv(sendElements1, Nsend1, sendOffsets1,
+                            null, Nrecv1, recvOffsets1);
   } else {
-    MPI_Alltoallv(sendElements0.ptr(), Nsend0.ptr(), sendOffsets0.ptr(), MPI_ELEMENT_T,
-                  NULL, Nrecv0.ptr(), recvOffsets0.ptr(), MPI_ELEMENT_T, comm);
-    MPI_Alltoallv(sendElements1.ptr(), Nsend1.ptr(), sendOffsets1.ptr(), MPI_ELEMENT_T,
-                  elements.ptr(), Nrecv1.ptr(), recvOffsets1.ptr(), MPI_ELEMENT_T, comm);
+    comm.Alltoallv(sendElements0, Nsend0, sendOffsets0,
+                            null, Nrecv0, recvOffsets0);
+    comm.Alltoallv(sendElements1, Nsend1, sendOffsets1,
+                        elements, Nrecv1, recvOffsets1);
   }
 
-  MPI_Barrier(comm);
-  MPI_Type_free(&MPI_ELEMENT_T);
-
-  MPI_Comm newComm;
-  MPI_Comm_split(comm, rank<size0, rank, &newComm);
-  MPI_Comm_free(&comm);
+  comm_t newComm = comm.Split(rank<size0, rank);
+  comm.Free();
   comm = newComm;
 
-  MPI_Comm_rank(comm, &rank);
-  MPI_Comm_size(comm, &size);
+  rank = comm.rank();
+  size = comm.size();
 
   /*Global number of elements*/
-  hlong localNverts=static_cast<hlong>(Nverts);
-  MPI_Allreduce(&localNverts, &NVertsGlobal, 1, MPI_HLONG, MPI_SUM, comm);
+  NVertsGlobal=static_cast<hlong>(Nverts);
+  comm.Allreduce(NVertsGlobal);
 
   /*Get global element count offsets*/
-  MPI_Scan(&localNverts, &VoffsetU, 1, MPI_HLONG, MPI_SUM, comm);
+  hlong localNverts=static_cast<hlong>(Nverts);
+  comm.Scan(localNverts, VoffsetU);
   VoffsetL = VoffsetU-Nverts;
 }
 
@@ -343,13 +321,13 @@ void graph_t::Report() {
 
   /* Min,Avg,Max Element counts*/
   hlong globalNverts = static_cast<hlong>(Nverts);
-  MPI_Allreduce(MPI_IN_PLACE, &globalNverts, 1, MPI_HLONG, MPI_SUM, gcomm);
+  gcomm.Allreduce(globalNverts);
   dfloat avgNverts = static_cast<dfloat>(globalNverts)/gsize;
 
-  dlong minNverts=0;
-  dlong maxNverts=0;
-  MPI_Allreduce(&Nverts, &minNverts, 1, MPI_DLONG, MPI_MIN, gcomm);
-  MPI_Allreduce(&Nverts, &maxNverts, 1, MPI_DLONG, MPI_MAX, gcomm);
+  dlong minNverts=Nverts;
+  dlong maxNverts=Nverts;
+  gcomm.Allreduce(minNverts, comm_t::Min);
+  gcomm.Allreduce(maxNverts, comm_t::Max);
 
 
   dlong cut=0.0;
@@ -365,13 +343,13 @@ void graph_t::Report() {
   }
 
   hlong gCut = static_cast<hlong>(cut);
-  MPI_Allreduce(MPI_IN_PLACE, &gCut, 1, MPI_HLONG, MPI_SUM, gcomm);
+  gcomm.Allreduce(gCut);
   hlong avgCut = gCut/gsize;
 
-  dlong minCut=0;
-  dlong maxCut=0;
-  MPI_Allreduce(&cut, &minCut, 1, MPI_DLONG, MPI_MIN, gcomm);
-  MPI_Allreduce(&cut, &maxCut, 1, MPI_DLONG, MPI_MAX, gcomm);
+  dlong minCut=cut;
+  dlong maxCut=cut;
+  gcomm.Allreduce(minCut, comm_t::Min);
+  gcomm.Allreduce(maxCut, comm_t::Max);
 
   if(grank==0) {
     printf("--------------------------------------ParAdogs Report------------------------------------------\n");
@@ -396,12 +374,12 @@ void graph_t::Report() {
 }
 
 void graph_t::ExtractMesh(dlong &Nelements_,
-                          libp::memory<hlong>& EToV,
-                          libp::memory<hlong>& EToE,
-                          libp::memory<int>& EToF,
-                          libp::memory<dfloat>& EX,
-                          libp::memory<dfloat>& EY,
-                          libp::memory<dfloat>& EZ) {
+                          memory<hlong>& EToV,
+                          memory<hlong>& EToE,
+                          memory<int>& EToF,
+                          memory<dfloat>& EX,
+                          memory<dfloat>& EY,
+                          memory<dfloat>& EZ) {
 
   /*Destroy any exiting mesh data and create new data from current graph*/
   Nelements_ = Nelements;
@@ -441,11 +419,6 @@ void graph_t::ExtractMesh(dlong &Nelements_,
       }
     }
   }
-}
-
-graph_t::~graph_t() {
-  if (gcomm!=MPI_COMM_NULL) MPI_Comm_free(&gcomm);
-  if (comm!=MPI_COMM_NULL) MPI_Comm_free(&comm);
 }
 
 } //namespace paradogs

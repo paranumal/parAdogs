@@ -34,9 +34,7 @@ namespace paradogs {
 parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
 
   // MPI info
-  int rank, size;
-  MPI_Comm_rank(A.comm, &rank);
-  MPI_Comm_size(A.comm, &size);
+  int size = A.comm.size();
 
   // This function computes a smoothed prologation operator
   // via a single weighted Jacobi iteration on the tentative
@@ -53,16 +51,15 @@ parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
   //Jacobi weight
   const dfloat omega = (4./3.)/A.rho;
 
-  libp::memory<hlong> recvRows(A.Ncols-A.NlocalCols);
-  libp::memory<int> sendCounts(size);
-  libp::memory<int> recvCounts(size, 0);
-  libp::memory<int> sendOffsets(size+1);
-  libp::memory<int> recvOffsets(size+1);
+  memory<hlong> recvRows(A.Ncols-A.NlocalCols);
+  memory<int> sendCounts(size);
+  memory<int> recvCounts(size, 0);
+  memory<int> sendOffsets(size+1);
+  memory<int> recvOffsets(size+1);
 
-  libp::memory<hlong> globalRowStarts(size+1);
+  memory<hlong> globalRowStarts(size+1);
   globalRowStarts[0]=0;
-  MPI_Allgather(&(T.rowOffsetU), 1, MPI_HLONG,
-                globalRowStarts.ptr()+1, 1, MPI_HLONG, T.comm);
+  T.comm.Allgather(T.rowOffsetU, globalRowStarts+1);
 
   //use the colMap of A to list the needed rows of T
   int r=0;
@@ -75,8 +72,7 @@ parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
   globalRowStarts.free();
 
   //share the counts
-  MPI_Alltoall(recvCounts.ptr(), 1, MPI_INT,
-               sendCounts.ptr(), 1, MPI_INT, A.comm);
+  A.comm.Alltoall(recvCounts, sendCounts);
 
   sendOffsets[0]=0;
   recvOffsets[0]=0;
@@ -86,12 +82,11 @@ parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
   }
 
   int sendTotal = sendOffsets[size];
-  libp::memory<hlong> sendRows(sendTotal);
+  memory<hlong> sendRows(sendTotal);
 
   //share the rowIds
-  MPI_Alltoallv(recvRows.ptr(), recvCounts.ptr(), recvOffsets.ptr(), MPI_HLONG,
-                sendRows.ptr(), sendCounts.ptr(), sendOffsets.ptr(), MPI_HLONG,
-                T.comm);
+  T.comm.Alltoallv(recvRows, recvCounts, recvOffsets,
+                   sendRows, sendCounts, sendOffsets);
 
   //we now have a list of rows to send, count the nnz to send
   dlong nnzTotal=0;
@@ -105,7 +100,7 @@ parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
     nnzTotal += sendCounts[r]; //tally the total
   }
 
-  libp::memory<nonZero_t> sendNonZeros(nnzTotal);
+  memory<nonZero_t> sendNonZeros(nnzTotal);
 
   nnzTotal=0; //reset
   for (r=0;r<size;r++) {
@@ -126,8 +121,7 @@ parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
     }
   }
 
-  MPI_Alltoall(sendCounts.ptr(), 1, MPI_INT,
-               recvCounts.ptr(), 1, MPI_INT, A.comm);
+  A.comm.Alltoall(sendCounts, recvCounts);
 
   for (r=0;r<size;r++) {
     sendOffsets[r+1] = sendOffsets[r]+sendCounts[r];
@@ -136,29 +130,12 @@ parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
 
 
   dlong Toffdnnz = recvOffsets[size]; //total nonzeros
-  libp::memory<nonZero_t> ToffdRows(Toffdnnz);
+  memory<nonZero_t> ToffdRows(Toffdnnz);
 
-  // Make the MPI_NONZERO_T data type
-  MPI_Datatype MPI_NONZERO_T;
-  MPI_Datatype dtype[3] = {MPI_HLONG, MPI_HLONG, MPI_DFLOAT};
-  int blength[3] = {1, 1, 1};
-  MPI_Aint addr[3], displ[3];
-  MPI_Get_address ( &(ToffdRows[0]    ), addr+0);
-  MPI_Get_address ( &(ToffdRows[0].col), addr+1);
-  MPI_Get_address ( &(ToffdRows[0].val), addr+2);
-  displ[0] = 0;
-  displ[1] = addr[1] - addr[0];
-  displ[2] = addr[2] - addr[0];
-  MPI_Type_create_struct (3, blength, displ, dtype, &MPI_NONZERO_T);
-  MPI_Type_commit (&MPI_NONZERO_T);
-
-  MPI_Alltoallv(sendNonZeros.ptr(), sendCounts.ptr(), sendOffsets.ptr(), MPI_NONZERO_T,
-                ToffdRows.ptr(), recvCounts.ptr(), recvOffsets.ptr(), MPI_NONZERO_T,
-                T.comm);
+  T.comm.Alltoallv(sendNonZeros, sendCounts, sendOffsets,
+                      ToffdRows, recvCounts, recvOffsets);
 
   //clean up
-  MPI_Barrier(T.comm);
-  MPI_Type_free(&MPI_NONZERO_T);
   sendNonZeros.free();
   sendRows.free();
   recvRows.free();
@@ -170,7 +147,7 @@ parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
   //we now have all the needed nonlocal rows (should also be sorted by row then col)
 
   //make an array of row offsets so we know how large each row is
-  libp::memory<dlong> ToffdRowOffsets(A.Ncols-A.NlocalCols+1, 0);
+  memory<dlong> ToffdRowOffsets(A.Ncols-A.NlocalCols+1, 0);
 
   dlong id=0;
   for (dlong n=0;n<Toffdnnz;n++) {
@@ -191,8 +168,8 @@ parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
   // the entries
 
   // Find how big the intermediate form is
-  libp::memory<dlong> rowStarts(A.Nrows+1, 0);
-  libp::memory<dlong> rowCounts(A.Nrows, 0);
+  memory<dlong> rowStarts(A.Nrows+1, 0);
+  memory<dlong> rowCounts(A.Nrows, 0);
 
   /*Count entries per row*/
   #pragma omp parallel for
@@ -225,7 +202,7 @@ parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
 
   dlong NNZ = rowStarts[A.Nrows];
 
-  libp::memory<nonZero_t> Ptmp(NNZ);
+  memory<nonZero_t> Ptmp(NNZ);
 
   //count total number of nonzeros we find
   dlong nnz =0;
@@ -328,7 +305,7 @@ parCSR SmoothProlongator(const parCSR& A, const parCSR& T) {
   rowCounts.free();
 
   // cooP.nnz = nnz;
-  libp::memory<nonZero_t> entries(nnz);
+  memory<nonZero_t> entries(nnz);
 
   //compress nonzeros
   nnz = 0;

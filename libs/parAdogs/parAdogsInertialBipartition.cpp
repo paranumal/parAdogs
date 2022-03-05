@@ -41,13 +41,12 @@ namespace paradogs {
 /****************************************/
 void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
 
-  libp::memory<int> partition(Nverts);
+  memory<int> partition(Nverts);
 
-  double I[9] = {0.0, 0.0, 0.0,
-                 0.0, 0.0, 0.0,
-                 0.0, 0.0, 0.0};
+  memory<double> I;
+  I.calloc(9);
 
-  libp::memory<dfloat> x, y, z;
+  memory<dfloat> x, y, z;
 
   if (dim==2) {
     x.malloc(Nverts);
@@ -66,7 +65,7 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
     }
 
     /*Compute center of mass of whole mesh*/
-    double avg[2];
+    memory<double> avg(2);
 
     avg[0]=0.0;
     avg[1]=0.0;
@@ -74,7 +73,7 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
       avg[0] += x[e];
       avg[1] += y[e];
     }
-    MPI_Allreduce(MPI_IN_PLACE, avg, 2, MPI_DOUBLE, MPI_SUM, comm);
+    comm.Allreduce(avg);
 
     avg[0] /= NVertsGlobal;
     avg[1] /= NVertsGlobal;
@@ -86,8 +85,7 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
       I[0] += X*X; I[1] += X*Y;
       I[2] += Y*X; I[3] += Y*Y;
     }
-
-    MPI_Allreduce(MPI_IN_PLACE, I, 4, MPI_DOUBLE, MPI_SUM, comm);
+    comm.Allreduce(I);
 
   } else {
     x.malloc(Nverts);
@@ -110,7 +108,7 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
     }
 
     /*Compute center of mass of whole mesh*/
-    double avg[3];
+    memory<double> avg(3);
 
     avg[0]=0.0;
     avg[1]=0.0;
@@ -120,7 +118,7 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
       avg[1] += y[e];
       avg[2] += z[e];
     }
-    MPI_Allreduce(MPI_IN_PLACE, avg, 3, MPI_DOUBLE, MPI_SUM, comm);
+    comm.Allreduce(avg);
 
     avg[0] /= NVertsGlobal;
     avg[1] /= NVertsGlobal;
@@ -135,8 +133,7 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
       I[3] += Y*X; I[4] += Y*Y; I[5] += Y*Z;
       I[6] += Z*X; I[7] += Z*Y; I[8] += Z*Z;
     }
-
-    MPI_Allreduce(MPI_IN_PLACE, I, 9, MPI_DOUBLE, MPI_SUM, comm);
+    comm.Allreduce(I);
   }
 
   /*Find the principal axis of inertia*/
@@ -148,13 +145,10 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
   double W[3];
   int LWORK = 8;
   double WORK[8];
-  dsyev_(&JOBZ, &UPLO, &N, I, &LDA, W, WORK, &LWORK, &INFO);
+  dsyev_(&JOBZ, &UPLO, &N, I.ptr(), &LDA, W, WORK, &LWORK, &INFO);
 
-  if(INFO) {
-    std::stringstream ss;
-    ss << "Paradogs: dsyev_ reports info = " << INFO << " in InertialBipartition";
-    LIBP_ABORT(ss.str());
-  }
+  LIBP_ABORT("Paradogs: dsyev_ reports info = " << INFO << " in InertialBipartition",
+             INFO);
 
   /*Find the largest eigenvalue*/
   double max = W[0];
@@ -169,13 +163,13 @@ void graph_t::InertialBipartition(const dfloat targetFraction[2]) {
 
   /*Princial axis is the eigenvector with largest eigenvalue*/
   double a[3];
-  double* maxV = I + maxloc*N;
+  memory<double> maxV = I + maxloc*N;
   for (int i=0;i<N;++i) {
     a[i] = maxV[i];
   }
 
   /*Use principal axis to bipartion graph*/
-  libp::memory<dfloat> F(Nverts);
+  memory<dfloat> F(Nverts);
 
   if (dim==2) {
     for (dlong e=0;e<Nverts;++e) {

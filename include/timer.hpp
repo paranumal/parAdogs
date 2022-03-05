@@ -2,7 +2,7 @@
 
 The MIT License (MIT)
 
-Copyright (c) 2017 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
+Copyright (c) 2020 Tim Warburton, Noel Chalmers, Jesse Chan, Ali Karakus
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,39 +24,33 @@ SOFTWARE.
 
 */
 
-#ifndef PARADOGS_HPP
-#define PARADOGS_HPP 1
+#ifndef LIBP_TIMER_HPP
+#define LIBP_TIMER_HPP
 
 #include "core.hpp"
-#include "settings.hpp"
+#include "comm.hpp"
 #include "platform.hpp"
+#include <chrono>
 
 namespace libp {
 
-namespace paradogs {
+using timePoint_t = std::chrono::time_point<std::chrono::high_resolution_clock>;
 
-void AddSettings(settings_t& settings);
-void ReportSettings(settings_t& settings);
+/* Host time*/
+timePoint_t Time();
 
-void MeshPartition(platform_t &platform,
-                   settings_t &settings,
-                   dlong &Nelements,
-                   const  int dim,
-                   const  int Nverts,
-                   const  int Nfaces,
-                   const  int NfaceVertices,
-                   const  memory<int>& faceVertices,
-                   memory<hlong>& EToV,
-                   memory<hlong>& EToE,
-                   memory<int>& EToF,
-                   memory<dfloat>& EX,
-                   memory<dfloat>& EY,
-                   memory<dfloat>& EZ,
-                   comm_t comm);
+/* Host time after global sync*/
+timePoint_t GlobalTime(comm_t comm);
 
-} //namespace paradogs
+/* Host time after platform sync*/
+timePoint_t PlatformTime(platform_t &platform);
+
+/* Host time after platform sync*/
+timePoint_t GlobalPlatformTime(platform_t &platform);
+
+/*Time between time points, in seconds*/
+double ElapsedTime(const timePoint_t start, const timePoint_t end);
 
 } //namespace libp
 
 #endif
-
