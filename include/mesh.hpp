@@ -43,7 +43,7 @@ class mesh_t {
 public:
   platform_t platform;
   settings_t settings;
-  occa::properties props;
+  properties_t props;
 
   comm_t comm;
   int rank, size;

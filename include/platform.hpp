@@ -179,6 +179,14 @@ class platform_t {
     return comm.size();
   }
 
+  int getDeviceCount(const std::string mode) {
+    return occa::getDeviceCount(mode);
+  }
+
+  void setCacheDir(const std::string cacheDir) {
+    occa::env::setOccaCacheDir(cacheDir);
+  }
+
  private:
   void DeviceConfig();
   void DeviceProperties();
