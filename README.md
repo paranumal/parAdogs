@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/468401914.svg)](https://zenodo.org/badge/latestdoi/468401914)
+
 ## ParADoGs
 ParADoGs (**Par**allel **A**ccelerated **D**istribution of **G**raph**s**) is an experiemental distributed and fine-grain parallel mesh partitioner. It is designed for, and uses libraries from, [libParanumal](https://github.com/paranumal/libparanumal/), a finite element testbed funded in part by the US Department of Energy as part of the activities of the [Center for Efficient Exscale Discretizations](http://ceed.exascaleproject.org).
 
