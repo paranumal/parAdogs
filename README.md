@@ -20,15 +20,15 @@ C. Local Ordering:
 ### 2. Dependencies
 - Message Passing Interface (MPI v3.0 or higher).
   * The ParADoGs makefiles assume that mpic++ is installed and visible in your path.
-- BLAS and LAPACK libraries.
-  * By default, the build system will look for `libblas` and `liblapack` in your default library search paths.
-  * The library paths can also be manually specified in `make.top` with the `LIBP_BLAS_DIR` and `LIBP_LAPACK_DIR` variables.
-  * Some Linux distributions will package BLAS and LAPACK libraries. For example, on Ubuntu systems these libraries can be installed via `sudo apt install libblas-dev liblapack-dev`
+- OpenBLAS library.
+  * By default, the build system will look for `libopenblas` in your default library search paths.
+  * The library paths can also be manually specified in `make.top` with the `LIBP_BLAS_DIR` variable.
+  * Some Linux distributions will package the OpenBLAS library. For example, on Ubuntu systems the library can be installed via `sudo apt install libopenblas-dev`
 - Open Concurrent Compute Abstraction (OCCA)
   * OCCA is tracked in ParADoGs as a git submodule.
   * OCCA will try to detect if any of these execution models are installed: OpenMP, CUDA, HIP, OpenCL, and/or SYCL.
   * By default, if OCCA does not detect a chosen mode of execution it will default to Serial execution.
-  * You will need to adjust the libParnumal setup input files to choose the execution model and compute device appropriate for your system.
+  * You will need to adjust the libParanumal setup input files to choose the execution model and compute device appropriate for your system.
   * The OCCA github repo is [here](https://github.com/libocca/occa)
   * The OCCA webpage is [here](http://libocca.org)
 
@@ -39,8 +39,8 @@ Optional:
 ---
 ### 3. Building
 ```
-git clone --recursive https://github.com/noelchalmers/paradogs
-cd paradogs
+git clone --recursive https://github.com/paranumal/parAdogs
+cd parAdogs
 make -j `nproc` 
 ```
 
