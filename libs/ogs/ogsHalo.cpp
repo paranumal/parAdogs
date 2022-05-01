@@ -196,7 +196,20 @@ template void halo_t::Exchange(memory<double> v, const int k);
 template void halo_t::Exchange(memory<int> v, const int k);
 template void halo_t::Exchange(memory<long long int> v, const int k);
 
-/********************************
+
+template void halo_t::ExchangeStart(memory<float> v, const int k);
+template void halo_t::ExchangeStart(memory<double> v, const int k);
+template void halo_t::ExchangeStart(memory<int> v, const int k);
+template void halo_t::ExchangeStart(memory<long long int> v, const int k);
+
+template void halo_t::ExchangeFinish(memory<float> v, const int k);
+template void halo_t::ExchangeFinish(memory<double> v, const int k);
+template void halo_t::ExchangeFinish(memory<int> v, const int k);
+template void halo_t::ExchangeFinish(memory<long long int> v, const int k);
+
+  
+
+  /********************************
  * Combine
  ********************************/
 template<typename T>
